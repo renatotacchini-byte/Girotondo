@@ -1,4 +1,4 @@
-const CACHE='girotondo-0.6.8';
+const CACHE='girotondo-0.7.0';
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE).then(cache => cache.addAll([

@@ -9,7 +9,7 @@
   "background_color": "#ffffff",
   "theme_color": "#1f4e78",
   "lang": "it-IT",
-  "description": "Girotondo - gestione dei trasporti",
+  "description": "Girotondo 0.7.0 - gestione dei trasporti",
   "icons": [
     {
       "src": "./icons/icon-192.png",
