@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#1f4e78"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icons/icon-192.png">
-<title>Girotondo 0.7.1</title>
+<title>Girotondo 0.8.0</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}.app{max-width:560px;margin:auto;min-height:100vh;background:#fff}header{position:sticky;top:0;background:#fff;border-bottom:1px solid #dfe3e7;padding:14px 15px;z-index:3}.brand{display:flex;justify-content:space-between;align-items:center}.brand h1{margin:0;font-size:24px}.tag{font-size:10px;font-weight:800;background:#edf3f8;color:#1f4e78;padding:7px 8px;border-radius:9px}.sub{font-size:13px;color:#68737d}.tabs{display:flex;gap:6px;margin-top:12px}.tab{flex:1;border:1px solid #d6dbe0;border-radius:10px;background:#fff;padding:9px 3px;font-weight:750}.tab.active{background:#1f4e78;color:#fff}.days{display:flex;gap:6px;overflow:auto;margin-top:9px}.day{border:1px solid #d6dbe0;background:#fff;border-radius:9px;padding:8px 13px;white-space:nowrap}.day.active{border-color:#1f4e78;color:#1f4e78;background:#eef4f9}main{padding:15px}.hidden{display:none}.title{font-size:18px;font-weight:850;margin-bottom:11px}.card{border:1px solid #d9dee3;border-radius:14px;padding:13px;margin-bottom:10px}.carTop{display:flex;justify-content:space-between;align-items:center}.num{font-size:20px;font-weight:850}.op{background:#e3f0df;border-radius:10px;padding:6px 9px;text-align:right}.op small{display:block;font-size:9px}.op b{font-size:13px}.meta{font-size:12px;color:#68737d;margin-top:6px}.chips{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.chip{font-size:11px;background:#f1f3f5;padding:5px 7px;border-radius:8px}.stop{border:1px solid #dfe3e7;border-radius:13px;padding:12px;margin:8px 0}.fixed{border-left:5px solid #1f4e78}.time{font-size:17px;font-weight:850}.hint{font-size:11px;color:#68737d}.people{font-weight:750;margin-top:3px}.route{font-size:13px;color:#68737d;line-height:1.4;margin-top:4px}.actions{display:flex;gap:7px;margin-top:9px}.actions button{flex:1;border:0;border-radius:9px;padding:9px;font-weight:800;font-size:12px}.map{background:#eef4f9;color:#1f4e78}.abs{background:#fff0ec;color:#8a321f}.info{background:#f3f5f7;padding:10px;border-radius:10px;font-size:12px;line-height:1.45;margin:10px 0}.badge{float:right;background:#edf3f8;color:#1f4e78;padding:5px 7px;border-radius:8px;font-size:10px;font-weight:800}.item{padding:8px 0;border-top:1px solid #e5e7ea;font-size:13px}.item:first-child{border-top:0}.stats{display:flex;gap:7px}.stats div{flex:1;border:1px solid #dfe3e7;border-radius:10px;padding:9px}.stats b{display:block;font-size:19px}.stats span{font-size:10px;color:#68737d}.btn{width:100%;border:0;border-radius:10px;padding:10px;background:#1f4e78;color:#fff;font-weight:800;margin-top:8px}.back{border:0;background:none;color:#1f4e78;padding:0 0 10px}
 .prog-card{border:1px solid #d9dee3;border-radius:14px;padding:13px;margin:10px 0}.prog-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.prog-label{font-size:11px;font-weight:800;color:#68737d}.prog-select{width:100%;padding:10px;margin-top:4px;border:1px solid #d6dbe0;border-radius:9px;background:#fff;font:inherit}
@@ -153,7 +153,7 @@ document.getElementById("tOrg").onclick=function(){
 <script>
 (function(){
  const b=document.getElementById("openProgrammazione");
- if(b)b.addEventListener("click",()=>{show("orgView");const e=document.getElementById("programmazione");if(e){e.classList.remove("hidden");e.scrollIntoView({behavior:"smooth",block:"start")}}});
+ if(b)b.addEventListener("click",()=>{show("orgView");const e=document.getElementById("programmazione");if(e){e.classList.remove("hidden");e.scrollIntoView({behavior:"smooth",block:"start"});}});
 })();
 </script>
 
@@ -280,4 +280,139 @@ document.getElementById("tOrg").onclick=function(){
   setTimeout(()=>{roleLabel();renderOperator();refreshStats();},50);
 })();
 </script>
+
+<script>
+/* Girotondo 0.8.0 - gestione assenze per tipo/intervallo + mappe via link esterno */
+(function(){
+  const ABS_PREFIX='girotondo_abs_v8_';
+  const weekStart=new Date(2026,8,21); // lunedì della settimana prototipo
+  const dayNames=['','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
+  const dirLabel=d=>d==='andata'?'Andata':'Ritorno';
+  const key=(g,child)=>ABS_PREFIX+g+'_'+encodeURIComponent(child);
+  function load(g,child){try{const v=localStorage.getItem(key(g,child));return v?JSON.parse(v):null}catch(e){return null}}
+  function save(g,child,obj){localStorage.setItem(key(g,child),JSON.stringify(obj))}
+  function remove(g,child){localStorage.removeItem(key(g,child))}
+  function dateForDay(n){const d=new Date(weekStart);d.setDate(d.getDate()+Number(n)-1);return d}
+  function iso(d){return d.toISOString().slice(0,10)}
+  function fmt(d){return new Date(d+'T12:00:00').toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'})}
+  function todayDay(){return ({Lunedì:1,Martedì:2,Mercoledì:3,Giovedì:4,Venerdì:5,Sabato:6,Domenica:7})[window.currentDay||'Lunedì']||1}
+  function allChildren(g){const a=[];['a','r'].forEach(k=>(trips[g][k]||[]).forEach(s=>String(s[1]).split(' + ').forEach(n=>{n=n.trim();if(n&&!a.includes(n))a.push(n)})));return a}
+  function statusFor(abs,day,g,dir,child){
+    if(!abs)return null;
+    const dt=iso(dateForDay(day));
+    const start=abs.start,end=abs.end;
+    if(abs.mode==='giorno') return (dt===start||dt===end)?'absente':null;
+    if(abs.mode==='andata') return dt>=start&&dt<=end&&dir==='andata'?'absente':null;
+    if(abs.mode==='ritorno') return dt>=start&&dt<=end&&dir==='ritorno'?'absente':null;
+    if(abs.mode==='tutto') return dt>=start&&dt<=end?'absente':null;
+    return null;
+  }
+  function returningToday(abs,day){
+    if(!abs||!abs.end)return false;
+    const dt=iso(dateForDay(day));
+    const next=new Date(abs.end+'T12:00:00');next.setDate(next.getDate()+1);
+    return iso(next)===dt;
+  }
+  function rangeLabel(abs){
+    if(abs.mode==='giorno')return 'Assente tutto il giorno · '+fmt(abs.start);
+    if(abs.mode==='andata')return 'Assente solo andata · '+fmt(abs.start)+(abs.start!==abs.end?' → '+fmt(abs.end):'');
+    if(abs.mode==='ritorno')return 'Assente solo ritorno · '+fmt(abs.start)+(abs.start!==abs.end?' → '+fmt(abs.end):'');
+    return 'Assente tutto il giorno · '+fmt(abs.start)+' → '+fmt(abs.end);
+  }
+  function uniqueStops(g,dir){
+    const arr=trips[g][dir==='andata'?'a':'r']||[], out=[];
+    arr.forEach((s,i)=>String(s[1]).split(' + ').forEach(n=>{n=n.trim();if(!out.some(x=>x.child===n))out.push({child:n,index:i,stop:s})}));
+    return out;
+  }
+  function installAssenze(){
+    const old=document.getElementById('openAssenze'); if(!old)return;
+    const fresh=old.cloneNode(true); old.replaceWith(fresh);
+    fresh.addEventListener('click',()=>openAssenzeV8());
+  }
+  function openAssenzeV8(){
+    ['opView','autoView','orgView','detail'].forEach(id=>{const e=$(id);if(e)e.classList.add('hidden')});
+    const e=$('assenzeView');if(e)e.classList.remove('hidden');
+    renderAssenzeV8();
+  }
+  window.openAssenzeV8=openAssenzeV8;
+  function renderAssenzeV8(){
+    const box=$('assenzeLista');if(!box)return;
+    const day=Number($('assGiorno')?.value||1);
+    box.innerHTML=Object.keys(trips).map(g=>{
+      const children=allChildren(g);
+      return `<div class="card" style="margin:8px 0"><div class="carTop"><span class="num">🚐 Giro ${g}</span></div>`+
+      children.map(child=>{
+        const a=load(g,child); const st=a?rangeLabel(a):'Nessuna assenza attiva';
+        const returning=returningToday(a,day);
+        return `<div class="person-row" style="align-items:flex-start"><div><div class="people">${child}</div><small style="display:block;opacity:.72;margin-top:3px">${st}</small>${returning?'<div style="margin-top:5px;color:#217a3a;font-weight:800">🟢 Rientra oggi</div>':''}</div><button type="button" class="abs" data-abs-menu="${g}|${encodeURIComponent(child)}">${a?'✏️ Modifica assenza':'🚫 Segna assenza'} ▾</button></div>`;
+      }).join('')+'</div>';
+    }).join('');
+    box.querySelectorAll('[data-abs-menu]').forEach(b=>b.addEventListener('click',()=>openAbsMenu(b.dataset.absMenu.split('|')[0],decodeURIComponent(b.dataset.absMenu.split('|')[1]))));
+  }
+  function openAbsMenu(g,child){
+    const old=document.getElementById('absModal');if(old)old.remove();
+    const a=load(g,child), base=a||{mode:'tutto',start:iso(dateForDay(Number($('assGiorno')?.value||1))),end:iso(dateForDay(Number($('assGiorno')?.value||1)))};
+    const m=document.createElement('div');m.id='absModal';m.style.cssText='position:fixed;inset:0;background:#0006;z-index:50;display:flex;align-items:flex-end;justify-content:center;padding:10px';
+    m.innerHTML=`<div style="background:#fff;border-radius:16px;padding:16px;width:min(540px,100%);max-height:90vh;overflow:auto"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">🚫 Assenza · ${child}</h3><button type="button" id="absClose" style="border:0;background:#eef1f4;border-radius:8px;padding:7px 10px">✕</button></div><div class="sub" style="margin-top:4px">Scegli il tipo di assenza</div><label class="prog-label" style="display:block;margin-top:12px">Tipo<select id="absType" class="prog-select"><option value="tutto">Assente tutto il giorno</option><option value="andata">Assente solo andata</option><option value="ritorno">Assente solo ritorno</option><option value="intervallo">Assente dal giorno … al giorno …</option></select></label><div id="absDates" style="margin-top:10px"><label class="prog-label">Dal<input id="absStart" type="date" value="${base.start}" class="prog-select"></label><label class="prog-label" style="display:block;margin-top:8px">Al<input id="absEnd" type="date" value="${base.end}" class="prog-select"></label></div><div class="edit-actions"><button type="button" class="cancel" id="absCancel">Annulla</button><button type="button" class="save" id="absSave">Salva assenza</button></div>${a?'<button type="button" class="btn" id="absDelete" style="background:#8a2f1d">🗑️ Cancella assenza</button>':''}</div>`;
+    document.body.appendChild(m);
+    const type=m.querySelector('#absType');const dates=m.querySelector('#absDates');
+    type.value=a?(a.mode==='giorno'?'tutto':a.mode):'tutto';
+    const sync=()=>{dates.style.display='block';}; sync();
+    type.addEventListener('change',sync);
+    m.querySelector('#absClose').onclick=m.querySelector('#absCancel').onclick=()=>m.remove();
+    m.querySelector('#absSave').onclick=()=>{
+      let mode=type.value,start=m.querySelector('#absStart').value,end=m.querySelector('#absEnd').value;
+      if(!start)start=iso(dateForDay(Number($('assGiorno')?.value||1))); if(!end)end=start;
+      if(mode!=='intervallo'){mode=mode==='tutto'?'giorno':mode;end=start;}
+      if(end<start){alert('La data finale non può precedere quella iniziale.');return;}
+      save(g,child,{mode,start,end,createdAt:new Date().toISOString()});m.remove();renderAssenzeV8();window.renderOpAbsences?.();window.refreshGiroStats?.();
+    };
+    const del=m.querySelector('#absDelete');if(del)del.onclick=()=>{remove(g,child);m.remove();renderAssenzeV8();window.renderOpAbsences?.();window.refreshGiroStats?.();};
+  }
+  window.renderAssenzeV8=renderAssenzeV8;
+
+  function mapsHref(q){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q)}
+  window.openGiroMap=function(q){window.location.assign(mapsHref(q));};
+  function mapAnchor(q){return `<a class="maplink" href="${mapsHref(q)}" target="_blank" rel="noopener noreferrer">📍 Apri punto sulla mappa</a>`}
+
+  window.renderOpAbsences=function(){
+    const panel=$('opAssenzePanel'),list=$('opAssenzeList');if(!panel||!list)return;
+    const day=todayDay(),rows=[],returns=[];
+    Object.keys(trips).forEach(g=>['andata','ritorno'].forEach(dir=>{
+      if(!assignedToMe(g,dir))return;
+      uniqueStops(g,dir).forEach(x=>{const a=load(g,x.child);if(statusFor(a,day,g,dir,x.child)==='absente')rows.push({g,dir,child:x.child});if(returningToday(a,day))returns.push({g,dir,child:x.child});});
+    }));
+    panel.style.display=(rows.length||returns.length)?'block':'none';
+    list.innerHTML=returns.map(x=>`<div style="padding:9px 0;border-bottom:1px solid #e3eee5"><b style="color:#217a3a">🟢 OGGI RIENTRA ${x.child.toUpperCase()}</b><br><small>Era assente · Giro ${x.g} · ${dirLabel(x.dir)}</small></div>`).join('')+rows.map(x=>`<div style="padding:8px 0;border-bottom:1px solid #eee"><b>🔴 ${x.child}</b><br><small>Giro ${x.g} · ${dirLabel(x.dir)} · assente</small></div>`).join('');
+  };
+
+  window.renderOperatorView=function(){
+    const v=$('opView');if(!v)return;const cards=[];
+    Object.keys(trips).forEach(g=>['andata','ritorno'].forEach(dir=>{
+      if(!assignedToMe(g,dir))return;const arr=trips[g][dir==='andata'?'a':'r'];
+      cards.push(`<div class="card" role="button" tabindex="0" onclick="openOperatorTrip(${g},'${dir}')"><span class="badge">${dir.toUpperCase()}</span><h3>🚐 ${g}</h3>${arr.map((s,i)=>{const x=getStop(dayNum(),g,dir,i,s);return `<div class="item"><b>${x[0]} · ${x[1]}</b><br>${x[2]} → ${x[3]}</div>`}).join('')}<div class="hint" style="margin-top:8px">Tocca per aprire la scaletta</div></div>`);
+    }));
+    v.innerHTML=`<div id="opAssenzePanel" class="card" style="display:none;border-left:4px solid #c62828;margin-bottom:10px"><div class="title">⚠️ Avvisi di oggi</div><div id="opAssenzeList"></div></div><div class="title">I miei incarichi</div><div class="sub">Operatore: Renato Tacchini</div>${cards.join('')||'<div class="info">Nessun incarico assegnato per questa giornata.</div>'}<div class="info">🔒 L'operatore non modifica la programmazione.</div>`;
+    renderOpAbsences();
+  };
+  window.openOperatorTrip=function(g,dir){
+    const arr=trips[g][dir==='andata'?'a':'r'];
+    $('detail').innerHTML=`<button class="back" onclick="show('opView');renderOperatorView()">← Torna ai miei incarichi</button><h2>🚐 Giro ${g}</h2><div class="sub">${currentDay} · ${dir.toUpperCase()} · ${assignedName(g,dir)}</div><div class="info"><b>Sola consultazione</b><br>Puoi segnalare l'assenza di un singolo assistito.</div>${arr.map((s,i)=>{const x=getStop(dayNum(),g,dir,i,s);const names=String(x[1]).split(' + ');return `<div class="stop ${x[4]?'fixed':''}"><div class="time">${x[0]} <span class="hint">• ${x[4]?'fisso':'indicativo'}</span></div>${mapAnchor(x[2])}<div class="route">📍 ${x[2]}<br>➡️ ${x[3]}</div>${names.map(n=>{const a=load(g,n),abs=statusFor(a,dayNum(),g,dir,n)==='absente',ret=returningToday(a,dayNum());return `<div class="person-row"><div class="people">${n}${abs?' <span style="color:#a12626">· ASSENTE</span>':''}${ret?' <span style="color:#217a3a">· RIENTRA OGGI</span>':''}</div>${abs?'<span style="color:#a12626;font-weight:800">🔴 Assente</span>':''}</div>`}).join('')}</div>`}).join('')}`;
+    show('detail');
+  };
+
+  // Update map links in organizer stop editor as real external links.
+  const oldToggle=window.toggleStopEditor;
+  window.toggleStopEditor=function(g){oldToggle(g);setTimeout(()=>{document.querySelectorAll('#stopEditor_'+g+' .maplink').forEach(el=>{const onclick=el.getAttribute('onclick')||'';const m=onclick.match(/value\)\.value\)/);});},0)};
+
+  // Stats count active absence records, not per-direction flags.
+  window.refreshGiroStats=function(){const stats=document.querySelectorAll('#orgView .stats b');if(!stats.length)return;let abs=0;for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.indexOf(ABS_PREFIX)===0)abs++;}stats[0].textContent=Object.keys(trips).length;stats[1].textContent=abs;let un=0;Object.keys(trips).forEach(g=>['andata','ritorno'].forEach(d=>{if(!girotondoProgValue(todayDay(),g,d))un++;}));stats[2].textContent=un;};
+
+  installAssenze();
+  const daySel=$('assGiorno');if(daySel)daySel.addEventListener('change',renderAssenzeV8);
+  const oldOp=$('tOp');if(oldOp)oldOp.addEventListener('click',()=>setTimeout(()=>{renderOperatorView();},0));
+  setTimeout(()=>{installAssenze();renderAssenzeV8();renderOperatorView();},80);
+})();
+</script>
+
 </body></html>
