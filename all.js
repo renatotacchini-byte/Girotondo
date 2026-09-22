@@ -1,42 +1,4 @@
-<!doctype html>
-<html lang="it">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#1f4e78"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icons/icon-192.png">
-<title>Girotondo 0.8.4.3</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}.app{max-width:560px;margin:auto;min-height:100vh;background:#fff}header{position:sticky;top:0;background:#fff;border-bottom:1px solid #dfe3e7;padding:14px 15px;z-index:3}.brand{display:flex;justify-content:space-between;align-items:center}.brand h1{margin:0;font-size:24px}.tag{font-size:10px;font-weight:800;background:#edf3f8;color:#1f4e78;padding:7px 8px;border-radius:9px}.sub{font-size:13px;color:#68737d}.tabs{display:flex;gap:6px;margin-top:12px}.tab{flex:1;border:1px solid #d6dbe0;border-radius:10px;background:#fff;padding:9px 3px;font-weight:750}.tab.active{background:#1f4e78;color:#fff}.days{display:flex;gap:6px;overflow:auto;margin-top:9px}.day{border:1px solid #d6dbe0;background:#fff;border-radius:9px;padding:8px 13px;white-space:nowrap}.day.active{border-color:#1f4e78;color:#1f4e78;background:#eef4f9}main{padding:15px}.hidden{display:none}.title{font-size:18px;font-weight:850;margin-bottom:11px}.card{border:1px solid #d9dee3;border-radius:14px;padding:13px;margin-bottom:10px}.carTop{display:flex;justify-content:space-between;align-items:center}.num{font-size:20px;font-weight:850}.op{background:#e3f0df;border-radius:10px;padding:6px 9px;text-align:right}.op small{display:block;font-size:9px}.op b{font-size:13px}.meta{font-size:12px;color:#68737d;margin-top:6px}.chips{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.chip{font-size:11px;background:#f1f3f5;padding:5px 7px;border-radius:8px}.stop{border:1px solid #dfe3e7;border-radius:13px;padding:12px;margin:8px 0}.fixed{border-left:5px solid #1f4e78}.time{font-size:17px;font-weight:850}.hint{font-size:11px;color:#68737d}.people{font-weight:750;margin-top:3px}.route{font-size:13px;color:#68737d;line-height:1.4;margin-top:4px}.actions{display:flex;gap:7px;margin-top:9px}.actions button{flex:1;border:0;border-radius:9px;padding:9px;font-weight:800;font-size:12px}.map{background:#eef4f9;color:#1f4e78}.abs{background:#fff0ec;color:#8a321f}.info{background:#f3f5f7;padding:10px;border-radius:10px;font-size:12px;line-height:1.45;margin:10px 0}.badge{float:right;background:#edf3f8;color:#1f4e78;padding:5px 7px;border-radius:8px;font-size:10px;font-weight:800}.item{padding:8px 0;border-top:1px solid #e5e7ea;font-size:13px}.item:first-child{border-top:0}.stats{display:flex;gap:7px}.stats div{flex:1;border:1px solid #dfe3e7;border-radius:10px;padding:9px}.stats b{display:block;font-size:19px}.stats span{font-size:10px;color:#68737d}.btn{width:100%;border:0;border-radius:10px;padding:10px;background:#1f4e78;color:#fff;font-weight:800;margin-top:8px}.back{border:0;background:none;color:#1f4e78;padding:0 0 10px}
-.prog-card{border:1px solid #d9dee3;border-radius:14px;padding:13px;margin:10px 0}.prog-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.prog-label{font-size:11px;font-weight:800;color:#68737d}.prog-select{width:100%;padding:10px;margin-top:4px;border:1px solid #d6dbe0;border-radius:9px;background:#fff;font:inherit}
-.person-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid #e5e9ed}
-.person-row .people{font-weight:700}
-.person-row .abs{flex:0 0 auto}
-.people-list{margin-top:8px}
-</style></head><body><div class="app">
-<header><div class="brand"><h1>Girotondo</h1><span class="tag" id="role">ORGANIZZATORE + OPERATORE</span></div><div class="sub" id="dayLabel">Lunedì • settimana tipo</div>
-<div class="tabs"><button class="tab active" id="tOp">👤 Operatore</button><button class="tab" id="tAuto">🚐 Auto</button><button class="tab" id="tOrg">👨‍💼 Organizzatore</button></div>
-<div class="days" id="days"></div></header><main>
-<section id="opView"><div id="opAssenzePanel" class="card" style="display:none;border-left:4px solid #c62828;margin-bottom:10px"><div class="title">⚠️ Assenze di oggi</div><div id="opAssenzeList"></div></div><div class="title">I miei incarichi</div><div class="sub">Operatore: Renny</div>
-<div class="card"><span class="badge">ANDATA</span><h3>🚐 1042</h3><div class="item"><b>08:00 · Kevin</b><br>Boggio – Asso → Bosisio Parini</div><div class="item"><b>≈ 08:10 · Suleyman + Sofia + Martina</b><br>Asso → Bosisio Parini</div><div class="item"><b>≈ 08:30 · Kelledy + Kelvin</b><br>Eupilio → Bosisio Parini</div></div>
-<div class="card"><span class="badge">RITORNO</span><h3>🚐 1040</h3><div class="item"><b>15:20 · Elisabetta + Leo + Nicole + altri</b><br>Ponte Lambro → rientro</div></div>
-<div class="info">🔒 L'operatore non modifica la programmazione. Può soltanto segnalare ciò che accade sul posto, come un'assenza.</div></section>
 
-<section id="autoView" class="hidden"><div class="title">Giri di oggi</div><div id="cars"></div></section>
-<section id="detail" class="hidden"></section>
-<section id="orgView" class="hidden"><div class="title">Pannello organizzatore</div>
-<div class="stats"><div><b>3</b><span>auto</span></div><div><b>1</b><span>assenza</span></div><div><b>0</b><span>da assegnare</span></div></div>
-<div class="card" style="margin-top:10px"><h3>Programmazione settimanale</h3><div class="item">1040 · Andata <b>Elga</b></div><div class="item">1040 · Ritorno <b>Renny</b></div><div class="item">1042 · Andata <b>Renny</b></div><div class="item">1042 · Ritorno <b>Marco</b></div><div class="item">1043 · Andata <b>Marco</b></div><div class="item">1043 · Ritorno <b>Elga</b></div><button type="button" class="btn" id="openProgrammazione">📅 Programmazione</button><button type="button" class="btn" id="openAssenze">🚫 Assenze</button></div>
-<div class="card" id="programmazionePanel" style="margin-top:10px">
-<h3>📅 Programmazione</h3>
-<div class="sub">Assegna l'operatore per ogni giro. Andata e ritorno possono essere diversi.</div>
-<label class="prog-label" style="display:block;margin-top:10px">Giorno
-<select class="prog-select" id="progGiorno">
-<option value="1">Lunedì</option><option value="2">Martedì</option><option value="3">Mercoledì</option>
-<option value="4">Giovedì</option><option value="5">Venerdì</option><option value="6">Sabato</option><option value="7">Domenica</option>
-</select></label><div id="progLista"></div></div>
-<div class="card"><h3>⚠️ Anomalie di oggi</h3><div class="item">Michele · 1042 · assente · 08:27 · Renny</div><button class="btn">Vedi storico</button></div>
-<div class="card"><h3>📊 Registro amministrativo</h3><div class="sub">Storico servizi, presenze/assenze, auto, giro, operatore e ora della segnalazione.</div><button class="btn" onclick="exportCSV()">Esporta registro</button></div></section>
-</main></div>
-<script>
 const trips={
 1040:{a:[["07:50","Michele","Rezzago","Ns. Famiglia – Ponte Lambro",1],["≈ 08:00","Impake + Deghene","Fermata bus – Asso","Ns. Famiglia – Ponte Lambro"],["≈ 08:05","Yad","Banca – Asso","Ns. Famiglia – Ponte Lambro"],["≈ 08:10","Leo + Nicole","Scarenna – Asso","Ns. Famiglia – Ponte Lambro"],["≈ 08:25","Angelica","Eupilio","Ns. Famiglia – Ponte Lambro"],["≈ 08:35","Morgan","Longone al Segrino","Ns. Famiglia – Ponte Lambro"]],r:[["15:20","Elisabetta + Leo + Nicole + altri","Ns. Famiglia – Ponte Lambro","Rientro alle abitazioni"]]},
 1042:{a:[["08:00","Kevin","Boggio – Asso","Ns. Famiglia – Bosisio Parini",1],["≈ 08:10","Suleyman + Sofia + Martina","Asso","Ns. Famiglia – Bosisio Parini"],["≈ 08:30","Kelledy + Kelvin","Eupilio","Ns. Famiglia – Bosisio Parini"]],r:[["15:40","Suleyman + Sofia + Martina + Kelledy + Kelvin","Ns. Famiglia – Bosisio Parini","Rientro alle fermate di salita"]]},
@@ -105,21 +67,8 @@ document.getElementById("tOrg").onclick=function(){
  if(oldOrgClick)oldOrgClick();
  renderProgrammazione();
 };
-</script>
-<div id="assenzeView" class="hidden"><button type="button" class="back" id="backFromAssenze">← Torna all’organizzatore</button>
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-      <div><h2 style="margin:0">🚫 Assenze</h2><div class="sub">Gestisci le assenze dei singoli assistiti.</div></div>
-      <select id="assGiorno" style="padding:9px;border:1px solid #d6dbe0;border-radius:9px">
-        <option value="1">Lunedì</option><option value="2">Martedì</option><option value="3">Mercoledì</option>
-        <option value="4">Giovedì</option><option value="5">Venerdì</option><option value="6">Sabato</option><option value="7">Domenica</option>
-      </select>
-    </div>
-    <div id="assenzeLista" style="margin-top:12px"></div>
-  </div>
-</div>
 
-<script>
+
 (function(){
   const absenceStoreKey=(day,giro,dir,child)=>`girotondo_abs_${day}_${giro}_${dir}_${child}`;
   const readAbs=(day,g,dir,child)=>{const v=localStorage.getItem(absenceStoreKey(day,g,dir,child));return v?JSON.parse(v):null};
@@ -148,16 +97,14 @@ document.getElementById("tOrg").onclick=function(){
   document.getElementById("openAssenze")?.addEventListener("click",openAssenze);
   document.getElementById("assGiorno")?.addEventListener("change",renderAssenze);
 })();
-</script>
 
-<script>
+
 (function(){
  const b=document.getElementById("openProgrammazione");
  if(b)b.addEventListener("click",()=>{show("orgView");const e=document.getElementById("programmazione");if(e){e.classList.remove("hidden");e.scrollIntoView({behavior:"smooth",block:"start"});}});
 })();
-</script>
 
-<script>
+
 (function(){
   const dayNumber=()=>({Lunedì:1,Martedì:2,Mercoledì:3,Giovedì:4,Venerdì:5,Sabato:6,Domenica:7})[window.currentDay||"Lunedì"]||1;
   function absKey(day,g,child){return `girotondo_abs_${day}_${g}_${child}`;}
@@ -191,14 +138,8 @@ document.getElementById("tOrg").onclick=function(){
   if(op)op.addEventListener("click",()=>setTimeout(renderOpAbsences,0));
   setTimeout(renderOpAbsences,0);
 })();
-</script>
 
-<style>
-.edit-panel{border:1px solid #d9dee3;border-radius:14px;padding:13px;margin:10px 0;background:#fafbfc}
-.edit-row{display:grid;grid-template-columns:78px 1fr;gap:8px;align-items:center;padding:8px 0;border-top:1px solid #e5e9ed}
-.edit-row:first-child{border-top:0}.maplink{display:block;text-decoration:none;color:#1f4e78;background:#eef4f9;border-radius:9px;padding:8px 9px;margin-top:8px;font-weight:800;font-size:12px;text-align:center}.edit-row input{width:100%;padding:9px;border:1px solid #d6dbe0;border-radius:9px;font:inherit}.edit-actions{display:flex;gap:7px;margin-top:10px}.edit-actions button{flex:1;border:0;border-radius:9px;padding:9px;font-weight:800}.save{background:#1f4e78;color:#fff}.cancel{background:#eef1f4;color:#18212b}
-</style>
-<script>
+
 /* Girotondo 0.6.9 - correzioni UI e gestione locale del prototipo */
 (function(){
   const ME="Renato Tacchini";
@@ -279,9 +220,8 @@ document.getElementById("tOrg").onclick=function(){
   const oldProgDay=$("progGiorno");if(oldProgDay)oldProgDay.addEventListener("change",()=>setTimeout(()=>{currentDay=["","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato","Domenica"][Number(oldProgDay.value)]||currentDay;renderProgrammazione();refreshStats();},0));
   setTimeout(()=>{roleLabel();renderOperator();refreshStats();},50);
 })();
-</script>
 
-<script>
+
 /* Girotondo 0.8.0 - gestione assenze per tipo/intervallo + mappe via link esterno */
 (function(){
   const ABS_PREFIX='girotondo_abs_v8_';
@@ -413,13 +353,40 @@ document.getElementById("tOrg").onclick=function(){
   const oldOp=$('tOp');if(oldOp)oldOp.addEventListener('click',()=>setTimeout(()=>{renderOperatorView();},0));
   setTimeout(()=>{installAssenze();renderAssenzeV8();renderOperatorView();},80);
 })();
-</script>
 
-<script src="all.js"></script>
-</body></html><script>
+
 /* Girotondo 0.8.1 - assistiti indipendenti, eccezioni individuali, assenze sincronizzate */
 (function(){
   const CHILD_PREFIX='girotondo_childstop_v81_';
+  // 0.8.3 fix: the 0.8.1 block is a separate scope, so it must not call
+  // helper functions that belong to the older 0.8.0 closure.
+  const ABS_PREFIX_V81='girotondo_abs_v8_';
+  const dayNumV81=()=>({Lunedì:1,Martedì:2,Mercoledì:3,Giovedì:4,Venerdì:5,Sabato:6,Domenica:7})[currentDay]||1;
+  const absKeyV81=(g,child)=>ABS_PREFIX_V81+g+'_'+encodeURIComponent(child);
+  const loadAbsV81=(g,child)=>{try{const v=localStorage.getItem(absKeyV81(g,child));return v?JSON.parse(v):null}catch(e){return null}};
+  const statusAbsV81=(abs,day,dir)=>{
+    if(!abs)return false;
+    const weekStart=new Date(2026,8,21); const dt=new Date(weekStart); dt.setDate(dt.getDate()+Number(day)-1);
+    const iso=dt.toISOString().slice(0,10);
+    if(abs.mode==='giorno') return iso===abs.start;
+    if(abs.mode==='andata') return iso>=abs.start&&iso<=abs.end&&dir==='andata';
+    if(abs.mode==='ritorno') return iso>=abs.start&&iso<=abs.end&&dir==='ritorno';
+    if(abs.mode==='tutto') return iso>=abs.start&&iso<=abs.end;
+    return false;
+  };
+  const returningV81=(abs,day)=>{
+    if(!abs||!abs.end)return false;
+    const d=new Date(abs.end+'T12:00:00');d.setDate(d.getDate()+1);
+    const weekStart=new Date(2026,8,21);const target=new Date(weekStart);target.setDate(target.getDate()+Number(day)-1);
+    return d.toISOString().slice(0,10)===target.toISOString().slice(0,10);
+  };
+  const assignedNameV81=(g,dir)=>{
+    const id=girotondoProgValue(dayNumV81(),g,dir);
+    const o=girotondoOperatori.find(x=>x.id===id);
+    return o?o.nome:'Non assegnato';
+  };
+  const assignedToMeV81=(g,dir)=>assignedNameV81(g,dir)==='Renato Tacchini';
+
   const childKey=(d,g,dir,child)=>CHILD_PREFIX+d+'_'+g+'_'+dir+'_'+encodeURIComponent(child);
   const readChild=(d,g,dir,child)=>{try{const v=localStorage.getItem(childKey(d,g,dir,child));return v?JSON.parse(v):null}catch(e){return null}};
   const writeChild=(d,g,dir,child,obj)=>localStorage.setItem(childKey(d,g,dir,child),JSON.stringify(obj));
@@ -440,11 +407,11 @@ document.getElementById("tOrg").onclick=function(){
     const a=load(g,child);
     const base=a||{mode:'giorno',start:baseDate,end:baseDate};
     const m=document.createElement('div');m.id='absModal';m.style.cssText='position:fixed;inset:0;background:#0006;z-index:50;display:flex;align-items:flex-end;justify-content:center;padding:10px';
-    m.innerHTML=`<div style="background:#fff;border-radius:16px;padding:16px;width:min(540px,100%);max-height:90vh;overflow:auto"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">🚫 Assenza · ${child}</h3><button type="button" id="absClose" style="border:0;background:#eef1f4;border-radius:8px;padding:7px 10px">✕</button></div><div class="sub" style="margin-top:4px">Oggi: ${currentDay} · ${fmt(baseDate)}</div><label class="prog-label" style="display:block;margin-top:12px">Tipo<select id="absType" class="prog-select"><option value="tutto">Assente tutto il giorno</option><option value="andata">Assente solo andata</option><option value="ritorno">Assente solo ritorno</option><option value="intervallo">Assente dal giorno … al giorno …</option></select></label><div id="absDates" style="display:none;margin-top:10px"><label class="prog-label">Dal<input id="absStart" type="date" value="${base.start||baseDate}" class="prog-select"></label><label class="prog-label" style="display:block;margin-top:8px">Al<input id="absEnd" type="date" value="${base.end||baseDate}" class="prog-select"></label></div><div class="edit-actions"><button type="button" class="cancel" id="absCancel">Annulla</button><button type="button" class="save" id="absSave">Salva assenza</button></div>${a?'<button type="button" class="btn" id="absDelete" style="background:#8a2f1d">🗑️ Cancella assenza</button>':''}</div>`;
+    m.innerHTML=`<div style="background:#fff;border-radius:16px;padding:16px;width:min(540px,100%);max-height:90vh;overflow:auto"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">🚫 Assenza · ${child}</h3><button type="button" id="absClose" style="border:0;background:#eef1f4;border-radius:8px;padding:7px 10px">✕</button></div><div class="sub" style="margin-top:4px">Oggi: ${currentDay} · ${fmt(baseDate)}</div><label class="prog-label" style="display:block;margin-top:12px">Tipo<select id="absType" class="prog-select"><option value="tutto">Assente tutto il giorno</option><option value="andata">Assente solo andata</option><option value="ritorno">Assente solo ritorno</option><option value="intervallo">Assente dal giorno … al giorno …</option></select></label><div id="absDates" style="display:none !important;margin-top:10px"><label class="prog-label">Dal<input id="absStart" type="date" value="${base.start||baseDate}" class="prog-select"></label><label class="prog-label" style="display:block;margin-top:8px">Al<input id="absEnd" type="date" value="${base.end||baseDate}" class="prog-select"></label></div><div class="edit-actions"><button type="button" class="cancel" id="absCancel">Annulla</button><button type="button" class="save" id="absSave">Salva assenza</button></div>${a?'<button type="button" class="btn" id="absDelete" style="background:#8a2f1d">🗑️ Cancella assenza</button>':''}</div>`;
     document.body.appendChild(m);
     const type=m.querySelector('#absType'), dates=m.querySelector('#absDates');
     type.value=a?(a.mode==='giorno'?'tutto':a.mode):'tutto';
-    const sync=()=>{const showDates=type.value==='intervallo'; dates.hidden=!showDates; dates.style.setProperty('display',showDates?'block':'none','important');}; sync(); type.addEventListener('change',sync);
+    const sync=()=>{dates.style.setProperty('display', type.value==='intervallo'?'block':'none','important');}; sync(); type.addEventListener('change',sync);
     m.querySelector('#absClose').onclick=m.querySelector('#absCancel').onclick=()=>m.remove();
     m.querySelector('#absSave').onclick=()=>{
       let mode=type.value,start=baseDate,end=baseDate;
@@ -462,7 +429,7 @@ document.getElementById("tOrg").onclick=function(){
   window.renderOperatorView=function(){
     const v=$('opView'); if(!v)return; const cards=[];
     Object.keys(trips).forEach(g=>['andata','ritorno'].forEach(dir=>{
-      if(!assignedToMe(g,dir))return;
+      if(!assignedToMeV81(g,dir))return;
       const arr=trips[g][dir==='andata'?'a':'r'];
       cards.push(`<div class="card" role="button" tabindex="0" onclick="openOperatorTrip(${g},'${dir}')"><span class="badge">${dir.toUpperCase()}</span><h3>🚐 ${g}</h3>${arr.map((s,i)=>{
         const kids=childrenOf(s); const shown=kids.map(ch=>{const x=childStop(todayNum(),g,dir,i,s,ch);return `<div class="item"><b>${x.time} · ${ch}</b><br>${x.pickup} → ${x.dropoff}</div>`}).join('');
@@ -470,14 +437,14 @@ document.getElementById("tOrg").onclick=function(){
       }).join('')}<div class="hint" style="margin-top:8px">Tocca per aprire la scaletta</div></div>`);
     }));
     v.innerHTML=`<div id="opAssenzePanel" class="card" style="display:none;border-left:4px solid #c62828;margin-bottom:10px"><div class="title">⚠️ Avvisi di oggi</div><div id="opAssenzeList"></div></div><div class="title">I miei incarichi</div><div class="sub">Operatore: Renato Tacchini</div>${cards.join('')||'<div class="info">Nessun incarico assegnato per questa giornata.</div>'}<div class="info">🔒 L'operatore non modifica la programmazione.</div>`;
-    renderOpAbsences();
+    window.renderOpAbsences?.();
   };
 
   window.openOperatorTrip=function(g,dir){
     const arr=trips[g][dir==='andata'?'a':'r'];
-    $('detail').innerHTML=`<button class="back" onclick="show('opView');renderOperatorView()">← Torna ai miei incarichi</button><h2>🚐 Giro ${g}</h2><div class="sub">${currentDay} · ${dir.toUpperCase()} · ${assignedName(g,dir)}</div><div class="info"><b>Sola consultazione</b><br>Ogni assistito è gestito singolarmente, anche quando condivide la stessa fermata.</div>${arr.map((s,i)=>{
+    $('detail').innerHTML=`<button class="back" onclick="show('opView');renderOperatorView()">← Torna ai miei incarichi</button><h2>🚐 Giro ${g}</h2><div class="sub">${currentDay} · ${dir.toUpperCase()} · ${assignedNameV81(g,dir)}</div><div class="info"><b>Sola consultazione</b><br>Ogni assistito è gestito singolarmente, anche quando condivide la stessa fermata.</div>${arr.map((s,i)=>{
       const kids=childrenOf(s);
-      return `<div class="stop ${s[4]?'fixed':''}"><div class="time">${s[0]} <span class="hint">• ${s[4]?'fisso':'indicativo'}</span></div><a class="maplink" href="${mapsHref(s[2])}" target="_blank" rel="noopener noreferrer">📍 Apri punto sulla mappa</a><div class="route">📍 ${s[2]}<br>➡️ ${s[3]}</div>${kids.map(ch=>{const x=childStop(todayNum(),g,dir,i,s,ch);const a=load(g,ch),abs=statusFor(a,todayNum(),g,dir,ch)==='absente',ret=returningToday(a,todayNum());return `<div class="person-row" style="padding:8px 0;border-top:1px solid #edf0f2"><div><div class="people">${ch}${abs?' <span style="color:#a12626">· ASSENTE</span>':''}${ret?' <span style="color:#217a3a">· RIENTRA OGGI</span>':''}</div><div class="route">📍 ${x.pickup}<br>➡️ ${x.dropoff}</div></div>${abs?'<span style="color:#a12626;font-weight:800">🔴 Assente</span>':''}</div>`}).join('')}</div>`;
+      return `<div class="stop ${s[4]?'fixed':''}"><div class="time">${s[0]} <span class="hint">• ${s[4]?'fisso':'indicativo'}</span></div><a class="maplink" href="${mapsHref(s[2])}" target="_blank" rel="noopener noreferrer">📍 Apri punto sulla mappa</a><div class="route">📍 ${s[2]}<br>➡️ ${s[3]}</div>${kids.map(ch=>{const x=childStop(todayNum(),g,dir,i,s,ch);const a=loadAbsV81(g,ch),abs=statusAbsV81(a,todayNum(),dir),ret=returningV81(a,todayNum());return `<div class="person-row" style="padding:8px 0;border-top:1px solid #edf0f2"><div><div class="people">${ch}${abs?' <span style="color:#a12626">· ASSENTE</span>':''}${ret?' <span style="color:#217a3a">· RIENTRA OGGI</span>':''}</div><div class="route">📍 ${x.pickup}<br>➡️ ${x.dropoff}</div></div>${abs?'<span style="color:#a12626;font-weight:800">🔴 Assente</span>':''}</div>`}).join('')}</div>`;
     }).join('')}`;
     show('detail');
   };
@@ -513,37 +480,3 @@ document.getElementById("tOrg").onclick=function(){
   window.refreshGiroStats=function(){const stats=document.querySelectorAll('#orgView .stats b');if(!stats.length)return;let abs=0;for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.indexOf('girotondo_abs_v8_')===0)abs++;}stats[0].textContent=Object.keys(trips).length;stats[1].textContent=abs;let un=0;Object.keys(trips).forEach(g=>['andata','ritorno'].forEach(d=>{if(!girotondoProgValue(todayNum(),g,d))un++;}));stats[2].textContent=un;};
   setTimeout(()=>{window.currentDay=currentDay;renderOperatorView();renderAssenzeV8();window.refreshGiroStats?.();},120);
 })();
-</script>
-<script>
-/* Girotondo 0.8.4.3 - unica correzione: campi Dal/Al solo per assenza a intervallo */
-(function(){
-  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-  function mapUrl(q){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q);}
-  window.openOperatorTrip=function(g,dir){
-    var t=window.trips || trips;
-    var arr=t[g] && t[g][dir==='andata'?'a':'r'];
-    if(!arr){alert('Scaletta non disponibile per questo giro.');return;}
-    var detail=document.getElementById('detail');
-    if(!detail){alert('Schermata dettaglio non disponibile.');return;}
-    var html='<button class="back" type="button" onclick="show(\'opView\');renderOperatorView&&renderOperatorView()">← Torna ai miei incarichi</button>';
-    html+='<h2>🚐 Giro '+esc(g)+'</h2>';
-    html+='<div class="sub">'+esc(window.currentDay || 'Oggi')+' · '+esc(dir.toUpperCase())+'</div>';
-    html+='<div class="info"><b>Sola consultazione</b><br>Questa è la scaletta del giro. Ogni assistito rimane un elemento indipendente.</div>';
-    arr.forEach(function(s){
-      var names=String(s[1]||'').split(/\s*\+\s*/).map(function(x){return x.trim();}).filter(Boolean);
-      html+='<div class="stop '+(s[4]?'fixed':'')+'">';
-      html+='<div class="time">'+esc(s[0])+' <span class="hint">• '+(s[4]?'fisso':'indicativo')+'</span></div>';
-      html+='<a class="maplink" href="'+mapUrl(s[2])+'" target="_blank" rel="noopener noreferrer">📍 Apri punto sulla mappa</a>';
-      html+='<div class="route">📍 '+esc(s[2])+'<br>➡️ '+esc(s[3])+'</div>';
-      names.forEach(function(name){
-        html+='<div class="person-row"><div class="people">'+esc(name)+'</div></div>';
-      });
-      html+='</div>';
-    });
-    detail.innerHTML=html;
-    show('detail');
-    window.scrollTo(0,0);
-  };
-  document.title='Girotondo 0.8.4.3';
-})();
-</script>
