@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · PWA 0.9.4 TEST</title>
+  <title>Girotondo · PWA 0.9.5 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -42,6 +42,9 @@
     .tabs{display:flex;gap:6px;margin-top:14px;overflow:auto}.tab{border:1px solid #d6dbe0;background:#fff;border-radius:9px;padding:9px 11px;font:inherit;font-weight:700;color:#1f4e78;white-space:nowrap}
     .tab.active{background:#1f4e78;color:#fff}.route-title{font-size:16px;margin:15px 0 6px;color:#1f4e78}
     .absence-row{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid #e5e9ed;padding:9px 0;font-size:14px}
+    .absence-alert{background:#fff1f0;border-left:4px solid #c62828;border-radius:10px;padding:12px;margin:12px 0;color:#8f2020}
+    .absence-alert strong{display:block}.absence-alert div{margin-top:7px}
+    .operation.absent{background:#fff1f0;border-left-color:#c62828}.absent-label{color:#a12626;font-weight:800}
     .small-btn{font-size:12px;padding:7px 9px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.form-grid .field{margin:5px 0}
     @media(max-width:430px){.form-grid{grid-template-columns:1fr}}
   </style>
@@ -152,14 +155,16 @@ function effectiveAssignments(rows,date,day){
   const specific=new Set(relevant.filter(a=>a.data_specifica).map(a=>a.giro_id+'|'+a.direzione));
   return relevant.filter(a=>a.data_specifica || !specific.has(a.giro_id+'|'+a.direzione));
 }
-function stopCards(program,stops,operations,names){
+function stopCards(program,stops,operations,names,absences=[]){
   const cards=stops.filter(f=>f.programmazione_tratta_id===program.id).map((f,i)=>{
-    const ops=operations.filter(o=>o.fermata_id===f.id).map(o=>
-      '<div class="operation"><strong>'+esc(o.azione)+'</strong> · '+esc(names.get(o.assistito_id)||'Assistito non trovato')+
+    const ops=operations.filter(o=>o.fermata_id===f.id).map(o=>{
+      const absent=absences.some(a=>a.tratta_id===program.tratta_id&&a.assistito_id===o.assistito_id);
+      return '<div class="operation'+(absent?' absent':'')+'"><strong>'+esc(o.azione)+'</strong> · '+esc(names.get(o.assistito_id)||'Assistito non trovato')+
+      (absent?' <span class="absent-label">🔴 ASSENTE</span>':'')+
       '<div class="muted">🕐 '+esc(o.orario_previsto?String(o.orario_previsto).slice(0,5):'—')+' · '+esc(o.tipo_orario||'A_SEGUIRE')+'</div>'+
       (o.destinazione?'<div class="muted">📍 '+esc(o.destinazione)+'</div>':'')+
-      (o.note?'<div class="muted">📝 '+esc(o.note)+'</div>':'')+'</div>'
-    ).join('');
+      (o.note?'<div class="muted">📝 '+esc(o.note)+'</div>':'')+'</div>';
+    }).join('');
     return '<div class="stop"><strong>Fermata '+(i+1)+' · '+esc(f.nome)+'</strong>'+
       (f.indirizzo?'<div class="muted">📍 '+esc(f.indirizzo)+'</div>':'')+
       (f.note?'<div class="muted">📝 '+esc(f.note)+'</div>':'')+
@@ -173,7 +178,7 @@ function absencePanel(route,routePrograms,stops,operations,names,absences,editab
   if(!people.length)return '';
   return '<div class="info"><strong>Assenze · '+esc(route.nome)+'</strong>'+people.map(id=>{
     const absence=absences.find(a=>a.tratta_id===route.id&&a.assistito_id===id);
-    return '<div class="absence-row"><span>'+esc(names.get(id)||'Assistito')+(absence?' · <strong>ASSENTE</strong>':'')+'</span>'+
+    return '<div class="absence-row"><span>'+esc(names.get(id)||'Assistito')+(absence?' · <span class="absent-label">🔴 ASSENTE</span>':'')+'</span>'+
       (absence?(editable?'<button class="btn secondary small-btn" type="button" data-absence-remove="'+esc(absence.id)+'">Annulla</button>':''):
         '<button class="btn secondary small-btn" type="button" data-absence-route="'+esc(route.id)+'" data-absence-person="'+esc(id)+'">Segnala assenza</button>')+'</div>';
   }).join('')+'</div>';
@@ -238,7 +243,7 @@ async function renderOrganizer(token,date,day){
         '</div><label class="field">Validità<select name="scope"><option value="date">Solo '+esc(date)+'</option><option value="weekly">Ogni '+esc(days[day-1])+'</option></select></label>'+
         '<button class="btn small-btn" type="submit">Salva assegnazione</button></form>':
         '<div class="info">La tratta con nome libero non è ancora compatibile con le assegnazioni Andata/Ritorno.</div>')+
-      absencePanel(route,routePrograms,stops,operations,names,absences,true)+'</section>';
+        absencePanel(route,routePrograms,stops,operations,names,absences,true)+'</section>';
   }).join('');
   $('status').textContent=visible.length?visible.length+' tratte programmate · '+visible.filter(r=>!assigned.some(a=>a.giro_id===r.giro_id&&a.direzione===String(r.nome).toLowerCase())).length+' da coprire.':'Nessuna tratta programmata per questo giorno.';
 }
@@ -273,14 +278,21 @@ async function render(){
       const matching=routes.filter(t=>t.giro_id===a.giro_id && t.nome.toLowerCase()===String(a.direzione).toLowerCase());
       const sequences=matching.flatMap(t=>programs.filter(p=>p.tratta_id===t.id).map(p=>({route:t,program:p})));
       const body=sequences.map(({route,program})=>
-        '<div class="sub">'+esc(route.nome)+'</div>'+stopCards(program,stops,operations,names)+
+        '<div class="sub">'+esc(route.nome)+'</div>'+stopCards(program,stops,operations,names,absences)+
         absencePanel(route,[program],stops,operations,names,absences,false)
       ).join('');
       return '<details class="card assignment"><summary><div class="line"><h2>🚐 '+esc(a.automezzi?.numero||a.giri?.numero||'—')+'</h2><span class="badge">'+esc(String(a.direzione).toUpperCase())+'</span></div>'+
         '<div class="summary-bottom"><span class="sub">Giro '+esc(a.giri?.numero||'—')+'</span><span class="expand-label">Scaletta</span></div></summary>'+
         '<div class="assignment-body">'+(body||'<div class="info">Nessuna programmazione attiva per questa tratta e questo giorno.</div>')+'</div></details>';
     }).join('');
-    $('assignments').innerHTML=cards;
+    const assignedRouteIds=new Set(assignments.flatMap(a=>routes.filter(t=>t.giro_id===a.giro_id&&t.nome.toLowerCase()===String(a.direzione).toLowerCase()&&programs.some(p=>p.tratta_id===t.id)).map(t=>t.id)));
+    const visibleAbsences=absences.filter(a=>assignedRouteIds.has(a.tratta_id));
+    const alerts=visibleAbsences.length?'<div class="absence-alert" role="alert"><strong>⚠️ Assenze del '+esc(selectedDate.toLocaleDateString('it-IT'))+'</strong>'+visibleAbsences.map(a=>{
+      const route=routes.find(t=>t.id===a.tratta_id);
+      const giro=assignments.find(x=>x.giro_id===route?.giro_id)?.giri?.numero||'—';
+      return '<div>🔴 '+esc(names.get(a.assistito_id)||'Assistito')+' · Giro '+esc(giro)+' · '+esc(route?.nome||'Tratta')+'</div>';
+    }).join('')+'</div>':'';
+    $('assignments').innerHTML=alerts+cards;
     $('status').textContent=assignments.length?assignments.length+' incarico/i assegnato/i.':'Nessun incarico assegnato per questo giorno.';
   }catch(e){if(token===renderToken)showError(e);}
 }
