@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · Operatore 0.9.2 TEST</title>
+  <title>Girotondo · Operatore 0.9.2.3 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -28,6 +28,9 @@
     .field input{display:block;width:100%;border:1px solid #d6dbe0;border-radius:9px;padding:11px;font:inherit;margin-top:5px}
     .auth{max-width:430px;margin:12vh auto;padding:22px;background:#fff;border-radius:16px}
     .hidden{display:none!important}
+    html.invite-pending #auth{display:none}
+    html.invite-pending #setup{display:block!important}
+    html.invite-pending #setupForm{display:none}
     .assignment summary{display:block;cursor:pointer;list-style:none;padding:3px 0;touch-action:manipulation}
     .assignment summary::-webkit-details-marker{display:none}
     .assignment summary:focus-visible{outline:2px solid #1f4e78;outline-offset:3px;border-radius:6px}
@@ -37,6 +40,12 @@
     .assignment[open] .expand-label::after{content:' ▴'}
     .assignment-body{border-top:1px solid #e5e9ed;margin-top:12px;padding-top:6px}
   </style>
+  <script>
+    // Read the invitation before the authentication SDK can inspect the URL.
+    const girotondoInvite=new URLSearchParams(location.hash.slice(1));
+    if(girotondoInvite.get('token_hash')&&girotondoInvite.get('type')==='invite')
+      document.documentElement.classList.add('invite-pending');
+  </script>
 </head>
 <body>
   <section id="auth" class="auth">
@@ -48,6 +57,16 @@
       <button id="loginBtn" class="btn" type="submit">Accedi</button>
     </form>
     <div id="authMessage" role="alert"></div>
+  </section>
+  <section id="setup" class="auth hidden">
+    <h1>Imposta la password</h1>
+    <p class="sub">Completa l’invito per accedere alla PWA Girotondo.</p>
+    <form id="setupForm">
+      <label class="field">Nuova password<input id="setupPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+      <label class="field">Conferma password<input id="setupConfirm" type="password" autocomplete="new-password" minlength="8" required></label>
+      <button id="setupBtn" class="btn" type="submit">Salva password</button>
+    </form>
+    <div id="setupMessage" role="alert">Verifica dell’invito in corso…</div>
   </section>
   <div id="app" class="app hidden">
     <header>
@@ -67,16 +86,22 @@
 'use strict';
 const SUPABASE_URL='https://eeowjngdvivbyiwelsnn.supabase.co';
 const SUPABASE_KEY='sb_publishable_f4I2_qMGt4KOYCARvp5_BA_b238Walc';
-const sb=window.supabase?.createClient(SUPABASE_URL,SUPABASE_KEY);
+const inviteTokenHash=girotondoInvite.get('type')==='invite'?girotondoInvite.get('token_hash'):null;
+const sb=window.supabase?.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{detectSessionInUrl:false}});
 if(!sb){
-  const message=document.getElementById('authMessage');
+  document.documentElement.classList.remove('invite-pending');
+  const message=document.getElementById(inviteTokenHash?'setupMessage':'authMessage');
   message.className='info error';
   message.textContent='Impossibile caricare il collegamento a Supabase. Controlla la connessione Internet e riapri il file.';
   document.getElementById('loginBtn').disabled=true;
+  document.getElementById('setupForm').classList.add('hidden');
+  if(inviteTokenHash){document.getElementById('auth').classList.add('hidden');document.getElementById('setup').classList.remove('hidden');}
 }else{
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const days=['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+let inviteMode=!!inviteTokenHash;
+let invitePending=inviteMode;
 let profile=null;
 let selectedDate=new Date();
 let renderToken=0;
@@ -159,8 +184,11 @@ async function render(){
   }catch(e){if(token===renderToken)showError(e);}
 }
 async function applySession(session){
+  if(invitePending)return;
   if(!session){
-    profile=null;++renderToken;$('app').classList.add('hidden');$('auth').classList.remove('hidden');return;
+    profile=null;++renderToken;$('app').classList.add('hidden');$('setup').classList.add('hidden');$('auth').classList.remove('hidden');
+    if(inviteMode){$('authMessage').className='info error';$('authMessage').textContent='Invito non valido o scaduto. Chiedi un nuovo invito all’organizzatore.';}
+    return;
   }
   try{
     const {data,error}=await sb.from('operatori').select('id,nome,cognome,ruolo,attivo')
@@ -169,12 +197,19 @@ async function applySession(session){
     if(!data||!data.attivo)throw new Error('Profilo operatore non attivo.');
     profile=data;
     $('identity').textContent=(data.nome||'')+' '+(data.cognome||'');
+    if(inviteMode){
+      $('auth').classList.add('hidden');$('app').classList.add('hidden');$('setup').classList.remove('hidden');
+      return;
+    }
+    $('setup').classList.add('hidden');
     $('auth').classList.add('hidden');$('app').classList.remove('hidden');
     await render();
   }catch(e){
     profile=null;
-    $('authMessage').className='info error';
-    $('authMessage').textContent=e.message||String(e);
+    const message=inviteMode?$('setupMessage'):$('authMessage');
+    if(inviteMode){$('auth').classList.add('hidden');$('setup').classList.remove('hidden');$('setupForm').classList.add('hidden');}
+    message.className='info error';
+    message.textContent=e.message||String(e);
   }
 }
 $('days').addEventListener('click',e=>{
@@ -201,9 +236,51 @@ $('loginForm').addEventListener('submit',async e=>{
     $('authMessage').textContent=error.message||String(error);
   }finally{$('loginBtn').disabled=false;}
 });
+$('setupForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const password=$('setupPassword').value;
+  const confirm=$('setupConfirm').value;
+  if(password!==confirm){$('setupMessage').className='info error';$('setupMessage').textContent='Le password non coincidono.';return;}
+  $('setupBtn').disabled=true;
+  $('setupMessage').className='info';$('setupMessage').textContent='Salvataggio…';
+  try{
+    const {error}=await sb.auth.updateUser({password});
+    if(error)throw error;
+    inviteMode=false;
+    history.replaceState(null,'',location.pathname);
+    $('setupPassword').value='';$('setupConfirm').value='';
+    const {data}=await sb.auth.getSession();
+    await applySession(data.session);
+  }catch(error){
+    $('setupMessage').className='info error';
+    $('setupMessage').textContent=error.message||String(error);
+  }finally{$('setupBtn').disabled=false;}
+});
 $('logout').addEventListener('click',()=>sb.auth.signOut());
 sb.auth.onAuthStateChange((_event,session)=>{setTimeout(()=>applySession(session),0);});
-sb.auth.getSession().then(({data,error})=>{if(error)showError(error);else applySession(data.session);});
+if(inviteTokenHash){
+  (async()=>{
+    try{
+      const {data,error}=await sb.auth.verifyOtp({token_hash:inviteTokenHash,type:'invite'});
+      if(error)throw error;
+      if(!data?.session)throw new Error('Sessione non ricevuta.');
+      invitePending=false;
+      document.documentElement.classList.remove('invite-pending');
+      $('setupForm').classList.remove('hidden');
+      $('setupMessage').textContent='';
+      history.replaceState(null,'',location.pathname+location.search);
+      await applySession(data.session);
+    }catch(error){
+      invitePending=false;
+      document.documentElement.classList.remove('invite-pending');
+      $('auth').classList.add('hidden');$('app').classList.add('hidden');$('setup').classList.remove('hidden');
+      $('setupForm').classList.add('hidden');
+      $('setupMessage').className='info error';
+      $('setupMessage').textContent='Invito non valido o scaduto. Chiedi all’organizzatore di creare un nuovo link. Dettaglio: '+(error.message||String(error));
+      history.replaceState(null,'',location.pathname+location.search);
+    }
+  })();
+}else sb.auth.getSession().then(({data,error})=>{if(error)showError(error);else applySession(data.session);});
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
 
