@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · PWA 0.9.5 TEST</title>
+  <title>Girotondo · PWA 0.9.6 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -45,6 +45,9 @@
     .absence-alert{background:#fff1f0;border-left:4px solid #c62828;border-radius:10px;padding:12px;margin:12px 0;color:#8f2020}
     .absence-alert strong{display:block}.absence-alert div{margin-top:7px}
     .operation.absent{background:#fff1f0;border-left-color:#c62828}.absent-label{color:#a12626;font-weight:800}
+    .return-alert{background:#eaf7ee;border-left:4px solid #278047;border-radius:10px;padding:12px;margin:12px 0;color:#196337}
+    .return-alert strong{display:block}.return-alert div{margin-top:7px}
+    .return-label{color:#217a3a;font-weight:800}.operation.returning{background:#edf8ef;border-left-color:#278047}
     .small-btn{font-size:12px;padding:7px 9px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.form-grid .field{margin:5px 0}
     @media(max-width:430px){.form-grid{grid-template-columns:1fr}}
   </style>
@@ -155,12 +158,19 @@ function effectiveAssignments(rows,date,day){
   const specific=new Set(relevant.filter(a=>a.data_specifica).map(a=>a.giro_id+'|'+a.direzione));
   return relevant.filter(a=>a.data_specifica || !specific.has(a.giro_id+'|'+a.direzione));
 }
-function stopCards(program,stops,operations,names,absences=[]){
+function periodState(periods,giroId,personId,date,previousDate){
+  const relevant=periods.filter(p=>p.giro_id===giroId&&p.assistito_id===personId);
+  if(relevant.some(p=>p.data_inizio<=date&&p.data_fine>=date))return 'absent';
+  return relevant.some(p=>p.data_fine===previousDate)?'returning':null;
+}
+function stopCards(program,stops,operations,names,absences=[],periods=[],giroId=null,date='',previousDate=''){
   const cards=stops.filter(f=>f.programmazione_tratta_id===program.id).map((f,i)=>{
     const ops=operations.filter(o=>o.fermata_id===f.id).map(o=>{
-      const absent=absences.some(a=>a.tratta_id===program.tratta_id&&a.assistito_id===o.assistito_id);
-      return '<div class="operation'+(absent?' absent':'')+'"><strong>'+esc(o.azione)+'</strong> · '+esc(names.get(o.assistito_id)||'Assistito non trovato')+
-      (absent?' <span class="absent-label">🔴 ASSENTE</span>':'')+
+      const routeAbsent=absences.some(a=>a.tratta_id===program.tratta_id&&a.assistito_id===o.assistito_id);
+      const period=periodState(periods,giroId,o.assistito_id,date,previousDate);
+      const absent=routeAbsent||period==='absent',returning=!absent&&period==='returning';
+      return '<div class="operation'+(absent?' absent':returning?' returning':'')+'"><strong>'+esc(o.azione)+'</strong> · '+esc(names.get(o.assistito_id)||'Assistito non trovato')+
+      (absent?' <span class="absent-label">🔴 ASSENTE</span>':returning?' <span class="return-label">🟢 RIENTRA OGGI</span>':'')+
       '<div class="muted">🕐 '+esc(o.orario_previsto?String(o.orario_previsto).slice(0,5):'—')+' · '+esc(o.tipo_orario||'A_SEGUIRE')+'</div>'+
       (o.destinazione?'<div class="muted">📍 '+esc(o.destinazione)+'</div>':'')+
       (o.note?'<div class="muted">📝 '+esc(o.note)+'</div>':'')+'</div>';
@@ -172,15 +182,21 @@ function stopCards(program,stops,operations,names,absences=[]){
   }).join('');
   return cards||'<div class="info">Nessuna fermata configurata.</div>';
 }
-function absencePanel(route,routePrograms,stops,operations,names,absences,editable){
+function absencePanel(route,routePrograms,stops,operations,names,absences,periods,editable,date,previousDate){
   const stopIds=new Set(stops.filter(f=>routePrograms.some(p=>p.id===f.programmazione_tratta_id)).map(f=>f.id));
   const people=[...new Set(operations.filter(o=>stopIds.has(o.fermata_id)).map(o=>o.assistito_id))];
   if(!people.length)return '';
   return '<div class="info"><strong>Assenze · '+esc(route.nome)+'</strong>'+people.map(id=>{
     const absence=absences.find(a=>a.tratta_id===route.id&&a.assistito_id===id);
-    return '<div class="absence-row"><span>'+esc(names.get(id)||'Assistito')+(absence?' · <span class="absent-label">🔴 ASSENTE</span>':'')+'</span>'+
+    const personPeriods=periods.filter(p=>p.giro_id===route.giro_id&&p.assistito_id===id);
+    const state=periodState(personPeriods,route.giro_id,id,date,previousDate);
+    const absent=!!absence||state==='absent';
+    const shownPeriods=editable?personPeriods.filter(p=>p.data_fine>=previousDate):[];
+    return '<div class="absence-row"><span>'+esc(names.get(id)||'Assistito')+(absent?' · <span class="absent-label">🔴 ASSENTE</span>':state==='returning'?' · <span class="return-label">🟢 RIENTRA OGGI</span>':'')+'</span>'+
       (absence?(editable?'<button class="btn secondary small-btn" type="button" data-absence-remove="'+esc(absence.id)+'">Annulla</button>':''):
-        '<button class="btn secondary small-btn" type="button" data-absence-route="'+esc(route.id)+'" data-absence-person="'+esc(id)+'">Segnala assenza</button>')+'</div>';
+        (absent?'':'<button class="btn secondary small-btn" type="button" data-absence-route="'+esc(route.id)+'" data-absence-person="'+esc(id)+'">Segnala assenza</button>'))+'</div>'+
+      (editable?shownPeriods.map(p=>'<div class="muted">Assenza dal '+esc(p.data_inizio)+' al '+esc(p.data_fine)+' <button class="btn secondary small-btn" type="button" data-period-remove="'+esc(p.id)+'">Annulla periodo</button></div>').join('')+
+        '<details><summary class="muted">＋ Assenza per più giorni</summary><form class="period-form" data-giro="'+esc(route.giro_id)+'" data-person="'+esc(id)+'"><div class="form-grid"><label class="field">Dal<input name="start" type="date" value="'+esc(date)+'" required></label><label class="field">Al<input name="end" type="date" value="'+esc(date)+'" required></label></div><button class="btn small-btn" type="submit">Salva periodo</button></form></details>':'');
   }).join('')+'</div>';
 }
 async function routeData(date,day){
@@ -201,6 +217,9 @@ async function readAbsences(date,routeIds){
   if(error)throw error;
   return data||[];
 }
+async function readPeriods(giroIds){
+  return readRows('assenze_periodo','id,giro_id,assistito_id,data_inizio,data_fine','giro_id',giroIds);
+}
 async function renderAuto(token,date,day){
   const {giri,routes,programs,stops,operations,names}=await routeData(date,day);
   const vehicles=await readRows('automezzi','id,numero','id',[...new Set(routes.map(t=>t.automezzo_id).filter(Boolean))]);
@@ -218,10 +237,11 @@ async function renderAuto(token,date,day){
 }
 async function renderOrganizer(token,date,day){
   const {giri,routes,programs,stops,operations,names}=await routeData(date,day);
-  const [raw,operators,vehicles,absences]=await Promise.all([
+  const previousDate=dateKey(new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()-1));
+  const [raw,operators,vehicles,absences,periods]=await Promise.all([
     allRows('assegnazioni','id,giro_id,direzione,giorno_settimana,data_specifica,operatore_id,automezzo_id'),
     allRows('operatori','id,nome,cognome,attivo'),allRows('automezzi','id,numero,attivo'),
-    readAbsences(date,routes.map(r=>r.id))
+    readAbsences(date,routes.map(r=>r.id)),readPeriods(giri.map(g=>g.id))
   ]);
   if(token!==renderToken)return;
   const assigned=effectiveAssignments(raw,date,day),opNames=new Map(operators.map(o=>[o.id,(o.nome||'')+' '+(o.cognome||'')]));
@@ -243,7 +263,7 @@ async function renderOrganizer(token,date,day){
         '</div><label class="field">Validità<select name="scope"><option value="date">Solo '+esc(date)+'</option><option value="weekly">Ogni '+esc(days[day-1])+'</option></select></label>'+
         '<button class="btn small-btn" type="submit">Salva assegnazione</button></form>':
         '<div class="info">La tratta con nome libero non è ancora compatibile con le assegnazioni Andata/Ritorno.</div>')+
-        absencePanel(route,routePrograms,stops,operations,names,absences,true)+'</section>';
+      absencePanel(route,routePrograms,stops,operations,names,absences,periods,true,date,previousDate)+'</section>';
   }).join('');
   $('status').textContent=visible.length?visible.length+' tratte programmate · '+visible.filter(r=>!assigned.some(a=>a.giro_id===r.giro_id&&a.direzione===String(r.nome).toLowerCase())).length+' da coprire.':'Nessuna tratta programmata per questo giorno.';
 }
@@ -251,6 +271,7 @@ async function render(){
   if(!profile)return;
   const token=++renderToken;
   const date=dateKey(selectedDate),day=weekday(selectedDate);
+  const previousDate=dateKey(new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()-1));
   renderDays();
   $('dateLabel').textContent=selectedDate.toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   $('status').className='info';
@@ -271,15 +292,17 @@ async function render(){
       .sort((a,b)=>a.ordine-b.ordine);
     const operations=await readRows('operazioni_programmazione','id,fermata_id,assistito_id,azione,orario_previsto,tipo_orario,destinazione,note','fermata_id',stops.map(f=>f.id));
     const people=await readRows('assistiti','id,nome,cognome','id',[...new Set(operations.map(o=>o.assistito_id))]);
-    const absences=await readAbsences(date,routes.map(r=>r.id));
+    const [absences,periods]=await Promise.all([
+      readAbsences(date,routes.map(r=>r.id)),readPeriods([...new Set(assignments.map(a=>a.giro_id))])
+    ]);
     if(token!==renderToken)return;
     const names=new Map(people.map(p=>[p.id,(p.nome||'')+' '+(p.cognome||'')]));
     const cards=assignments.map(a=>{
       const matching=routes.filter(t=>t.giro_id===a.giro_id && t.nome.toLowerCase()===String(a.direzione).toLowerCase());
       const sequences=matching.flatMap(t=>programs.filter(p=>p.tratta_id===t.id).map(p=>({route:t,program:p})));
       const body=sequences.map(({route,program})=>
-        '<div class="sub">'+esc(route.nome)+'</div>'+stopCards(program,stops,operations,names,absences)+
-        absencePanel(route,[program],stops,operations,names,absences,false)
+        '<div class="sub">'+esc(route.nome)+'</div>'+stopCards(program,stops,operations,names,absences,periods,route.giro_id,date,previousDate)+
+        absencePanel(route,[program],stops,operations,names,absences,periods,false,date,previousDate)
       ).join('');
       return '<details class="card assignment"><summary><div class="line"><h2>🚐 '+esc(a.automezzi?.numero||a.giri?.numero||'—')+'</h2><span class="badge">'+esc(String(a.direzione).toUpperCase())+'</span></div>'+
         '<div class="summary-bottom"><span class="sub">Giro '+esc(a.giri?.numero||'—')+'</span><span class="expand-label">Scaletta</span></div></summary>'+
@@ -287,12 +310,24 @@ async function render(){
     }).join('');
     const assignedRouteIds=new Set(assignments.flatMap(a=>routes.filter(t=>t.giro_id===a.giro_id&&t.nome.toLowerCase()===String(a.direzione).toLowerCase()&&programs.some(p=>p.tratta_id===t.id)).map(t=>t.id)));
     const visibleAbsences=absences.filter(a=>assignedRouteIds.has(a.tratta_id));
-    const alerts=visibleAbsences.length?'<div class="absence-alert" role="alert"><strong>⚠️ Assenze del '+esc(selectedDate.toLocaleDateString('it-IT'))+'</strong>'+visibleAbsences.map(a=>{
+    const periodAlerts=[];
+    for(const route of routes.filter(t=>assignedRouteIds.has(t.id))){
+      const routePrograms=programs.filter(p=>p.tratta_id===route.id);
+      const stopIds=new Set(stops.filter(f=>routePrograms.some(p=>p.id===f.programmazione_tratta_id)).map(f=>f.id));
+      for(const personId of new Set(operations.filter(o=>stopIds.has(o.fermata_id)).map(o=>o.assistito_id))){
+        const state=periodState(periods,route.giro_id,personId,date,previousDate);
+        if(state)periodAlerts.push({route,personId,state});
+      }
+    }
+    const label=x=>esc(names.get(x.personId)||'Assistito')+' · Giro '+esc(assignments.find(a=>a.giro_id===x.route.giro_id)?.giri?.numero||'—')+' · '+esc(x.route.nome);
+    const returning=periodAlerts.filter(x=>x.state==='returning'&&!visibleAbsences.some(a=>a.tratta_id===x.route.id&&a.assistito_id===x.personId));
+    const returnBanner=returning.length?'<div class="return-alert" role="status"><strong>🟢 Rientri del '+esc(selectedDate.toLocaleDateString('it-IT'))+'</strong>'+returning.map(x=>'<div>🟢 '+label(x)+'</div>').join('')+'</div>':'';
+    const alerts=visibleAbsences.length||periodAlerts.some(x=>x.state==='absent')?'<div class="absence-alert" role="alert"><strong>⚠️ Assenze del '+esc(selectedDate.toLocaleDateString('it-IT'))+'</strong>'+visibleAbsences.map(a=>{
       const route=routes.find(t=>t.id===a.tratta_id);
       const giro=assignments.find(x=>x.giro_id===route?.giro_id)?.giri?.numero||'—';
       return '<div>🔴 '+esc(names.get(a.assistito_id)||'Assistito')+' · Giro '+esc(giro)+' · '+esc(route?.nome||'Tratta')+'</div>';
-    }).join('')+'</div>':'';
-    $('assignments').innerHTML=alerts+cards;
+    }).join('')+periodAlerts.filter(x=>x.state==='absent'&&!visibleAbsences.some(a=>a.tratta_id===x.route.id&&a.assistito_id===x.personId)).map(x=>'<div>🔴 '+label(x)+'</div>').join('')+'</div>':'';
+    $('assignments').innerHTML=returnBanner+alerts+cards;
     $('status').textContent=assignments.length?assignments.length+' incarico/i assegnato/i.':'Nessun incarico assegnato per questo giorno.';
   }catch(e){if(token===renderToken)showError(e);}
 }
@@ -354,6 +389,23 @@ function actionFeedback(message,error=false){
   $('actionMessage').textContent=message;
 }
 $('assignments').addEventListener('submit',async e=>{
+  const periodForm=e.target.closest('.period-form');
+  if(periodForm){
+    e.preventDefault();
+    if(!['organizzatore','entrambi'].includes(profile?.ruolo))return;
+    const start=periodForm.elements.start.value,end=periodForm.elements.end.value;
+    if(!start||!end||end<start){actionFeedback('La data finale deve essere uguale o successiva a quella iniziale.',true);return;}
+    const button=periodForm.querySelector('button[type="submit"]');button.disabled=true;
+    actionFeedback('Salvataggio periodo…');
+    try{
+      const {error}=await sb.from('assenze_periodo').insert({giro_id:periodForm.dataset.giro,
+        assistito_id:periodForm.dataset.person,data_inizio:start,data_fine:end,segnalato_da:profile.id});
+      if(error)throw error;
+      await render();actionFeedback('Periodo di assenza salvato. Il rientro sarà segnalato il giorno successivo alla data finale.');
+    }catch(error){actionFeedback('Periodo non salvato: '+(error.message||String(error)),true);}
+    finally{button.disabled=false;}
+    return;
+  }
   const form=e.target.closest('.assign-form');
   if(!form)return;
   e.preventDefault();
@@ -381,16 +433,18 @@ $('assignments').addEventListener('submit',async e=>{
 $('assignments').addEventListener('click',async e=>{
   const add=e.target.closest('[data-absence-route][data-absence-person]');
   const remove=e.target.closest('[data-absence-remove]');
-  if(!add&&!remove)return;
-  if(remove&&!['organizzatore','entrambi'].includes(profile?.ruolo))return;
-  if(!window.confirm(add?'Confermi l’assenza per la data selezionata?':'Annullare questa assenza?'))return;
-  const button=add||remove;button.disabled=true;
+  const periodRemove=e.target.closest('[data-period-remove]');
+  if(!add&&!remove&&!periodRemove)return;
+  if((remove||periodRemove)&&!['organizzatore','entrambi'].includes(profile?.ruolo))return;
+  if(!window.confirm(add?'Confermi l’assenza per la data selezionata?':periodRemove?'Annullare l’intero periodo di assenza?':'Annullare questa assenza?'))return;
+  const button=add||remove||periodRemove;button.disabled=true;
   actionFeedback('Salvataggio assenza…');
   try{
     const result=add?await sb.from('assenze_tratta').insert({
       data_servizio:dateKey(selectedDate),tratta_id:add.dataset.absenceRoute,
       assistito_id:add.dataset.absencePerson,segnalato_da:profile.id}):
-      await sb.from('assenze_tratta').delete().eq('id',remove.dataset.absenceRemove);
+      periodRemove?await sb.from('assenze_periodo').delete().eq('id',periodRemove.dataset.periodRemove):
+        await sb.from('assenze_tratta').delete().eq('id',remove.dataset.absenceRemove);
     if(result.error)throw result.error;
     await render();
     actionFeedback(add?'Assenza segnalata.':'Assenza annullata.');
