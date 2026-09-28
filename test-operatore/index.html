@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · Operatore 0.9.2.3 TEST</title>
+  <title>Girotondo · PWA 0.9.4 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -25,7 +25,7 @@
     .info{background:#f3f5f7;border-radius:10px;padding:11px;font-size:13px;line-height:1.45;margin:12px 0}
     .error{background:#fff0ec;color:#8a321f}.btn{border:0;border-radius:10px;background:#1f4e78;color:#fff;font:inherit;font-weight:750;padding:10px 14px;cursor:pointer}
     .secondary{background:#eef4f9;color:#1f4e78}.field{display:block;margin:12px 0;font-weight:700;font-size:13px}
-    .field input{display:block;width:100%;border:1px solid #d6dbe0;border-radius:9px;padding:11px;font:inherit;margin-top:5px}
+    .field input,.field select{display:block;width:100%;border:1px solid #d6dbe0;border-radius:9px;padding:11px;font:inherit;margin-top:5px;background:#fff}
     .auth{max-width:430px;margin:12vh auto;padding:22px;background:#fff;border-radius:16px}
     .hidden{display:none!important}
     html.invite-pending #auth{display:none}
@@ -39,6 +39,11 @@
     .assignment .expand-label::after{content:' ▾'}
     .assignment[open] .expand-label::after{content:' ▴'}
     .assignment-body{border-top:1px solid #e5e9ed;margin-top:12px;padding-top:6px}
+    .tabs{display:flex;gap:6px;margin-top:14px;overflow:auto}.tab{border:1px solid #d6dbe0;background:#fff;border-radius:9px;padding:9px 11px;font:inherit;font-weight:700;color:#1f4e78;white-space:nowrap}
+    .tab.active{background:#1f4e78;color:#fff}.route-title{font-size:16px;margin:15px 0 6px;color:#1f4e78}
+    .absence-row{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid #e5e9ed;padding:9px 0;font-size:14px}
+    .small-btn{font-size:12px;padding:7px 9px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.form-grid .field{margin:5px 0}
+    @media(max-width:430px){.form-grid{grid-template-columns:1fr}}
   </style>
   <script>
     // Read the invitation before the authentication SDK can inspect the URL.
@@ -72,13 +77,15 @@
     <header>
       <div class="heading"><h1>Girotondo</h1><span class="tag">OPERATORE · TEST</span></div>
       <div id="identity" class="sub"></div>
+      <nav class="tabs" aria-label="Sezioni"><button id="tabOperator" class="tab active" type="button">👤 Operatore</button><button id="tabAuto" class="tab" type="button">🚐 Auto</button><button id="tabOrganizer" class="tab hidden" type="button">👨‍💼 Organizzatore</button></nav>
       <div id="days" class="days" aria-label="Giorni della settimana"></div>
     </header>
     <main>
-      <div class="line"><div><h2 style="margin:0">I miei incarichi</h2><div id="dateLabel" class="sub"></div></div><button id="logout" class="btn secondary" type="button">Esci</button></div>
+      <div class="line"><div><h2 id="viewTitle" style="margin:0">I miei incarichi</h2><div id="dateLabel" class="sub"></div></div><button id="logout" class="btn secondary" type="button">Esci</button></div>
       <div id="status" class="info" role="status">Caricamento…</div>
+      <div id="actionMessage" role="status"></div>
       <div id="assignments"></div>
-      <div class="info">🔒 Sola consultazione. La programmazione viene letta da Supabase.</div>
+      <div class="info">La programmazione ordinaria viene letta da Supabase. Le assegnazioni sono riservate all’organizzatore.</div>
     </main>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -105,6 +112,7 @@ let invitePending=inviteMode;
 let profile=null;
 let selectedDate=new Date();
 let renderToken=0;
+let activeView='operator';
 
 function dateKey(date){
   return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
@@ -116,7 +124,7 @@ function weekDates(date){
 }
 function showError(error){
   $('status').className='info error';
-  $('status').textContent='Impossibile caricare gli incarichi: '+(error.message||String(error));
+  $('status').textContent='Impossibile caricare i dati: '+(error.message||String(error));
 }
 function renderDays(){
   $('days').innerHTML=weekDates(selectedDate).map((date,i)=>
@@ -130,6 +138,110 @@ async function readRows(table,columns,column,ids){
   if(error)throw error;
   return data||[];
 }
+async function allRows(table,columns){
+  const {data,error}=await sb.from(table).select(columns);
+  if(error)throw error;
+  return data||[];
+}
+function activePrograms(rows,day,date){
+  return rows.filter(p=>p.attivo!==false && p.giorno_settimana===day &&
+    (!p.data_inizio||p.data_inizio<=date) && (!p.data_fine||p.data_fine>=date));
+}
+function effectiveAssignments(rows,date,day){
+  const relevant=rows.filter(a=>a.data_specifica===date || (!a.data_specifica&&a.giorno_settimana===day));
+  const specific=new Set(relevant.filter(a=>a.data_specifica).map(a=>a.giro_id+'|'+a.direzione));
+  return relevant.filter(a=>a.data_specifica || !specific.has(a.giro_id+'|'+a.direzione));
+}
+function stopCards(program,stops,operations,names){
+  const cards=stops.filter(f=>f.programmazione_tratta_id===program.id).map((f,i)=>{
+    const ops=operations.filter(o=>o.fermata_id===f.id).map(o=>
+      '<div class="operation"><strong>'+esc(o.azione)+'</strong> · '+esc(names.get(o.assistito_id)||'Assistito non trovato')+
+      '<div class="muted">🕐 '+esc(o.orario_previsto?String(o.orario_previsto).slice(0,5):'—')+' · '+esc(o.tipo_orario||'A_SEGUIRE')+'</div>'+
+      (o.destinazione?'<div class="muted">📍 '+esc(o.destinazione)+'</div>':'')+
+      (o.note?'<div class="muted">📝 '+esc(o.note)+'</div>':'')+'</div>'
+    ).join('');
+    return '<div class="stop"><strong>Fermata '+(i+1)+' · '+esc(f.nome)+'</strong>'+
+      (f.indirizzo?'<div class="muted">📍 '+esc(f.indirizzo)+'</div>':'')+
+      (f.note?'<div class="muted">📝 '+esc(f.note)+'</div>':'')+
+      (ops||'<div class="muted">Nessuna operazione.</div>')+'</div>';
+  }).join('');
+  return cards||'<div class="info">Nessuna fermata configurata.</div>';
+}
+function absencePanel(route,routePrograms,stops,operations,names,absences,editable){
+  const stopIds=new Set(stops.filter(f=>routePrograms.some(p=>p.id===f.programmazione_tratta_id)).map(f=>f.id));
+  const people=[...new Set(operations.filter(o=>stopIds.has(o.fermata_id)).map(o=>o.assistito_id))];
+  if(!people.length)return '';
+  return '<div class="info"><strong>Assenze · '+esc(route.nome)+'</strong>'+people.map(id=>{
+    const absence=absences.find(a=>a.tratta_id===route.id&&a.assistito_id===id);
+    return '<div class="absence-row"><span>'+esc(names.get(id)||'Assistito')+(absence?' · <strong>ASSENTE</strong>':'')+'</span>'+
+      (absence?(editable?'<button class="btn secondary small-btn" type="button" data-absence-remove="'+esc(absence.id)+'">Annulla</button>':''):
+        '<button class="btn secondary small-btn" type="button" data-absence-route="'+esc(route.id)+'" data-absence-person="'+esc(id)+'">Segnala assenza</button>')+'</div>';
+  }).join('')+'</div>';
+}
+async function routeData(date,day){
+  const giri=(await allRows('giri','id,numero,attivo')).filter(g=>g.attivo!==false)
+    .sort((a,b)=>String(a.numero).localeCompare(String(b.numero),'it',{numeric:true}));
+  const routes=(await readRows('tratte','id,giro_id,nome,automezzo_id,attivo','giro_id',giri.map(g=>g.id)))
+    .filter(t=>t.attivo!==false);
+  const programs=activePrograms(await readRows('programmazioni_tratta','id,tratta_id,giorno_settimana,data_inizio,data_fine,attivo','tratta_id',routes.map(t=>t.id)),day,date);
+  const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note','programmazione_tratta_id',programs.map(p=>p.id))).sort((a,b)=>a.ordine-b.ordine);
+  const operations=await readRows('operazioni_programmazione','id,fermata_id,assistito_id,azione,orario_previsto,tipo_orario,destinazione,note','fermata_id',stops.map(f=>f.id));
+  const people=await readRows('assistiti','id,nome,cognome','id',[...new Set(operations.map(o=>o.assistito_id))]);
+  const names=new Map(people.map(p=>[p.id,(p.nome||'')+' '+(p.cognome||'')]));
+  return {giri,routes,programs,stops,operations,names};
+}
+async function readAbsences(date,routeIds){
+  if(!routeIds.length)return [];
+  const {data,error}=await sb.from('assenze_tratta').select('id,tratta_id,assistito_id,data_servizio').eq('data_servizio',date).in('tratta_id',routeIds);
+  if(error)throw error;
+  return data||[];
+}
+async function renderAuto(token,date,day){
+  const {giri,routes,programs,stops,operations,names}=await routeData(date,day);
+  const vehicles=await readRows('automezzi','id,numero','id',[...new Set(routes.map(t=>t.automezzo_id).filter(Boolean))]);
+  if(token!==renderToken)return;
+  const numbers=new Map(vehicles.map(v=>[v.id,v.numero]));
+  $('assignments').innerHTML=giri.map(g=>{
+    const routeCards=routes.filter(t=>t.giro_id===g.id).map(route=>{
+      const matching=programs.filter(p=>p.tratta_id===route.id);
+      return '<h3 class="route-title">'+esc(route.nome)+(numbers.has(route.automezzo_id)?' · Auto '+esc(numbers.get(route.automezzo_id)):'')+'</h3>'+
+        (matching.length?matching.map(p=>stopCards(p,stops,operations,names)).join(''):'<div class="info">Nessuna programmazione per questo giorno.</div>');
+    }).join('');
+    return '<details class="card assignment"><summary><div class="line"><h2>🚐 Giro '+esc(g.numero)+'</h2><span class="expand-label">Scaletta</span></div></summary><div class="assignment-body">'+(routeCards||'<div class="info">Nessuna tratta attiva.</div>')+'</div></details>';
+  }).join('');
+  $('status').textContent=giri.length?giri.length+' giri disponibili.':'Nessun giro attivo.';
+}
+async function renderOrganizer(token,date,day){
+  const {giri,routes,programs,stops,operations,names}=await routeData(date,day);
+  const [raw,operators,vehicles,absences]=await Promise.all([
+    allRows('assegnazioni','id,giro_id,direzione,giorno_settimana,data_specifica,operatore_id,automezzo_id'),
+    allRows('operatori','id,nome,cognome,attivo'),allRows('automezzi','id,numero,attivo'),
+    readAbsences(date,routes.map(r=>r.id))
+  ]);
+  if(token!==renderToken)return;
+  const assigned=effectiveAssignments(raw,date,day),opNames=new Map(operators.map(o=>[o.id,(o.nome||'')+' '+(o.cognome||'')]));
+  const vehicleNames=new Map(vehicles.map(v=>[v.id,v.numero]));
+  const visible=routes.filter(t=>programs.some(p=>p.tratta_id===t.id));
+  $('assignments').innerHTML='<div class="info">Assegna un operatore per la settimana oppure solo per la data selezionata. La modifica per una data prevale su quella settimanale.</div>'+visible.map(route=>{
+    const giro=giri.find(g=>g.id===route.giro_id);
+    const direction=String(route.nome).toLowerCase();
+    const compatible=['andata','ritorno'].includes(direction);
+    const current=assigned.find(a=>a.giro_id===route.giro_id&&a.direzione===direction);
+    const routePrograms=programs.filter(p=>p.tratta_id===route.id);
+    const opOptions=operators.filter(o=>o.attivo!==false).map(o=>'<option value="'+esc(o.id)+'" '+(current?.operatore_id===o.id?'selected':'')+'>'+esc((o.nome||'')+' '+(o.cognome||''))+'</option>').join('');
+    const vehicleOptions=vehicles.filter(v=>v.attivo!==false).map(v=>'<option value="'+esc(v.id)+'" '+((current?.automezzo_id||route.automezzo_id)===v.id?'selected':'')+'>'+esc(v.numero)+'</option>').join('');
+    return '<section class="card"><h2>🚐 Giro '+esc(giro?.numero||'—')+' · '+esc(route.nome)+'</h2>'+
+      '<div class="sub">'+(current?'Assegnato a '+esc(opNames.get(current.operatore_id)||'Operatore')+' · Auto '+esc(vehicleNames.get(current.automezzo_id)||'—')+(current.data_specifica?' · Solo oggi':' · Settimanale'):'Da coprire')+'</div>'+
+      (compatible?'<form class="assign-form" data-giro="'+esc(route.giro_id)+'" data-direction="'+esc(direction)+'"><div class="form-grid">'+
+        '<label class="field">Operatore<select name="operatore" required><option value="">Seleziona</option>'+opOptions+'</select></label>'+
+        '<label class="field">Auto<select name="automezzo" required><option value="">Seleziona</option>'+vehicleOptions+'</select></label>'+
+        '</div><label class="field">Validità<select name="scope"><option value="date">Solo '+esc(date)+'</option><option value="weekly">Ogni '+esc(days[day-1])+'</option></select></label>'+
+        '<button class="btn small-btn" type="submit">Salva assegnazione</button></form>':
+        '<div class="info">La tratta con nome libero non è ancora compatibile con le assegnazioni Andata/Ritorno.</div>')+
+      absencePanel(route,routePrograms,stops,operations,names,absences,true)+'</section>';
+  }).join('');
+  $('status').textContent=visible.length?visible.length+' tratte programmate · '+visible.filter(r=>!assigned.some(a=>a.giro_id===r.giro_id&&a.direzione===String(r.nome).toLowerCase())).length+' da coprire.':'Nessuna tratta programmata per questo giorno.';
+}
 async function render(){
   if(!profile)return;
   const token=++renderToken;
@@ -140,13 +252,12 @@ async function render(){
   $('status').textContent='Caricamento…';
   $('assignments').innerHTML='';
   try{
+    if(activeView==='auto'){await renderAuto(token,date,day);return;}
+    if(activeView==='organizer'){await renderOrganizer(token,date,day);return;}
     const {data:raw,error:assignmentError}=await sb.from('assegnazioni')
-      .select('id,giro_id,direzione,giorno_settimana,data_specifica,giri(numero),automezzi(numero)')
-      .eq('operatore_id',profile.id);
+      .select('id,giro_id,operatore_id,direzione,giorno_settimana,data_specifica,giri(numero),automezzi(numero)');
     if(assignmentError)throw assignmentError;
-    const relevant=(raw||[]).filter(a=>a.data_specifica===date || (!a.data_specifica && a.giorno_settimana===day));
-    const specific=new Set(relevant.filter(a=>a.data_specifica).map(a=>a.giro_id+'|'+a.direzione));
-    const assignments=relevant.filter(a=>a.data_specifica || !specific.has(a.giro_id+'|'+a.direzione));
+    const assignments=effectiveAssignments(raw||[],date,day).filter(a=>a.operatore_id===profile.id);
     const routes=(await readRows('tratte','id,giro_id,nome,attivo','giro_id',[...new Set(assignments.map(a=>a.giro_id))]))
       .filter(t=>t.attivo!==false);
     const programs=(await readRows('programmazioni_tratta','id,tratta_id,giorno_settimana,data_inizio,data_fine,attivo','tratta_id',routes.map(t=>t.id)))
@@ -155,26 +266,16 @@ async function render(){
       .sort((a,b)=>a.ordine-b.ordine);
     const operations=await readRows('operazioni_programmazione','id,fermata_id,assistito_id,azione,orario_previsto,tipo_orario,destinazione,note','fermata_id',stops.map(f=>f.id));
     const people=await readRows('assistiti','id,nome,cognome','id',[...new Set(operations.map(o=>o.assistito_id))]);
+    const absences=await readAbsences(date,routes.map(r=>r.id));
     if(token!==renderToken)return;
     const names=new Map(people.map(p=>[p.id,(p.nome||'')+' '+(p.cognome||'')]));
     const cards=assignments.map(a=>{
       const matching=routes.filter(t=>t.giro_id===a.giro_id && t.nome.toLowerCase()===String(a.direzione).toLowerCase());
       const sequences=matching.flatMap(t=>programs.filter(p=>p.tratta_id===t.id).map(p=>({route:t,program:p})));
-      const body=sequences.map(({route,program})=>{
-        const cards=stops.filter(f=>f.programmazione_tratta_id===program.id).map((f,i)=>{
-          const ops=operations.filter(o=>o.fermata_id===f.id).map(o=>
-            '<div class="operation"><strong>'+esc(o.azione)+'</strong> · '+esc(names.get(o.assistito_id)||'Assistito non trovato')+
-            '<div class="muted">🕐 '+esc(o.orario_previsto?String(o.orario_previsto).slice(0,5):'—')+' · '+esc(o.tipo_orario||'A_SEGUIRE')+'</div>'+
-            (o.destinazione?'<div class="muted">📍 '+esc(o.destinazione)+'</div>':'')+
-            (o.note?'<div class="muted">📝 '+esc(o.note)+'</div>':'')+'</div>'
-          ).join('');
-          return '<div class="stop"><strong>Fermata '+(i+1)+' · '+esc(f.nome)+'</strong>'+
-            (f.indirizzo?'<div class="muted">📍 '+esc(f.indirizzo)+'</div>':'')+
-            (f.note?'<div class="muted">📝 '+esc(f.note)+'</div>':'')+
-            (ops||'<div class="muted">Nessuna operazione.</div>')+'</div>';
-        }).join('');
-        return '<div class="sub">'+esc(route.nome)+'</div>'+(cards||'<div class="info">Nessuna fermata configurata.</div>');
-      }).join('');
+      const body=sequences.map(({route,program})=>
+        '<div class="sub">'+esc(route.nome)+'</div>'+stopCards(program,stops,operations,names)+
+        absencePanel(route,[program],stops,operations,names,absences,false)
+      ).join('');
       return '<details class="card assignment"><summary><div class="line"><h2>🚐 '+esc(a.automezzi?.numero||a.giri?.numero||'—')+'</h2><span class="badge">'+esc(String(a.direzione).toUpperCase())+'</span></div>'+
         '<div class="summary-bottom"><span class="sub">Giro '+esc(a.giri?.numero||'—')+'</span><span class="expand-label">Scaletta</span></div></summary>'+
         '<div class="assignment-body">'+(body||'<div class="info">Nessuna programmazione attiva per questa tratta e questo giorno.</div>')+'</div></details>';
@@ -197,6 +298,9 @@ async function applySession(session){
     if(!data||!data.attivo)throw new Error('Profilo operatore non attivo.');
     profile=data;
     $('identity').textContent=(data.nome||'')+' '+(data.cognome||'');
+    $('tabOrganizer').classList.toggle('hidden',!['organizzatore','entrambi'].includes(data.ruolo));
+    if(activeView==='organizer'&&!['organizzatore','entrambi'].includes(data.ruolo))activeView='operator';
+    selectView(activeView,false);
     if(inviteMode){
       $('auth').classList.add('hidden');$('app').classList.add('hidden');$('setup').classList.remove('hidden');
       return;
@@ -218,6 +322,68 @@ $('days').addEventListener('click',e=>{
   const [y,m,d]=button.dataset.date.split('-').map(Number);
   selectedDate=new Date(y,m-1,d);
   render();
+});
+function selectView(view,refresh=true){
+  if(view==='organizer'&&!['organizzatore','entrambi'].includes(profile?.ruolo))return;
+  activeView=view;
+  for(const [name,id] of [['operator','tabOperator'],['auto','tabAuto'],['organizer','tabOrganizer']]){
+    $(id).classList.toggle('active',name===view);
+    $(id).toggleAttribute('aria-current',name===view);
+  }
+  $('viewTitle').textContent=view==='auto'?'Tutti i giri':view==='organizer'?'Organizzatore':'I miei incarichi';
+  $('actionMessage').textContent='';
+  if(refresh)render();
+}
+$('tabOperator').addEventListener('click',()=>selectView('operator'));
+$('tabAuto').addEventListener('click',()=>selectView('auto'));
+$('tabOrganizer').addEventListener('click',()=>selectView('organizer'));
+function actionFeedback(message,error=false){
+  $('actionMessage').className='info'+(error?' error':'');
+  $('actionMessage').textContent=message;
+}
+$('assignments').addEventListener('submit',async e=>{
+  const form=e.target.closest('.assign-form');
+  if(!form)return;
+  e.preventDefault();
+  if(!['organizzatore','entrambi'].includes(profile?.ruolo))return;
+  const giro_id=form.dataset.giro,direzione=form.dataset.direction;
+  const operatore_id=form.elements.operatore.value,automezzo_id=form.elements.automezzo.value;
+  const scope=form.elements.scope.value,date=dateKey(selectedDate),day=weekday(selectedDate);
+  const button=form.querySelector('button[type="submit"]');button.disabled=true;
+  actionFeedback('Salvataggio assegnazione…');
+  try{
+    let query=sb.from('assegnazioni').select('id').eq('giro_id',giro_id).eq('direzione',direzione);
+    query=scope==='date'?query.eq('data_specifica',date):query.is('data_specifica',null).eq('giorno_settimana',day);
+    const {data:existing,error:readError}=await query.maybeSingle();
+    if(readError)throw readError;
+    const values={operatore_id,automezzo_id};
+    const result=existing?await sb.from('assegnazioni').update(values).eq('id',existing.id).select('id').single():
+      await sb.from('assegnazioni').insert({...values,giro_id,direzione,
+        giorno_settimana:scope==='weekly'?day:null,data_specifica:scope==='date'?date:null}).select('id').single();
+    if(result.error)throw result.error;
+    await render();
+    actionFeedback('Assegnazione salvata.');
+  }catch(error){actionFeedback('Assegnazione non salvata: '+(error.message||String(error)),true);}
+  finally{button.disabled=false;}
+});
+$('assignments').addEventListener('click',async e=>{
+  const add=e.target.closest('[data-absence-route][data-absence-person]');
+  const remove=e.target.closest('[data-absence-remove]');
+  if(!add&&!remove)return;
+  if(remove&&!['organizzatore','entrambi'].includes(profile?.ruolo))return;
+  if(!window.confirm(add?'Confermi l’assenza per la data selezionata?':'Annullare questa assenza?'))return;
+  const button=add||remove;button.disabled=true;
+  actionFeedback('Salvataggio assenza…');
+  try{
+    const result=add?await sb.from('assenze_tratta').insert({
+      data_servizio:dateKey(selectedDate),tratta_id:add.dataset.absenceRoute,
+      assistito_id:add.dataset.absencePerson,segnalato_da:profile.id}):
+      await sb.from('assenze_tratta').delete().eq('id',remove.dataset.absenceRemove);
+    if(result.error)throw result.error;
+    await render();
+    actionFeedback(add?'Assenza segnalata.':'Assenza annullata.');
+  }catch(error){actionFeedback('Operazione non riuscita: '+(error.message||String(error)),true);}
+  finally{button.disabled=false;}
 });
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
