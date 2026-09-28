@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#1f4e78">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="../icons/icon-192.png">
+  <title>Girotondo · Operatore 0.9.1 TEST</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
+    .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
+    header{position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid #dfe3e7;padding:15px}
+    .heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    h1{font-size:24px;margin:0}.tag{font-size:11px;font-weight:800;background:#edf3f8;color:#1f4e78;padding:7px;border-radius:9px}
+    .sub{font-size:13px;color:#68737d}.days{display:flex;gap:6px;overflow:auto;margin-top:14px}
+    .day{border:1px solid #d6dbe0;background:#fff;border-radius:9px;padding:8px 12px;white-space:nowrap;font:inherit}
+    .day.active{border-color:#1f4e78;color:#1f4e78;background:#eef4f9;font-weight:750}
+    main{padding:15px}.card,.stop{border:1px solid #d9dee3;border-radius:14px;padding:13px;margin:10px 0}
+    .card h2{font-size:18px;margin:3px 0}.stop{background:#fff;margin:8px 0}
+    .operation{background:#f5f7f9;border-left:3px solid #cbd5df;border-radius:7px;padding:9px;margin-top:7px;font-size:14px}
+    .line{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.muted{color:#68737d;font-size:13px}
+    .badge{background:#edf3f8;color:#1f4e78;border-radius:8px;padding:5px 8px;font-size:11px;font-weight:800}
+    .info{background:#f3f5f7;border-radius:10px;padding:11px;font-size:13px;line-height:1.45;margin:12px 0}
+    .error{background:#fff0ec;color:#8a321f}.btn{border:0;border-radius:10px;background:#1f4e78;color:#fff;font:inherit;font-weight:750;padding:10px 14px;cursor:pointer}
+    .secondary{background:#eef4f9;color:#1f4e78}.field{display:block;margin:12px 0;font-weight:700;font-size:13px}
+    .field input{display:block;width:100%;border:1px solid #d6dbe0;border-radius:9px;padding:11px;font:inherit;margin-top:5px}
+    .auth{max-width:430px;margin:12vh auto;padding:22px;background:#fff;border-radius:16px}
+    .hidden{display:none!important}details summary{cursor:pointer;font-weight:750}
+  </style>
+</head>
+<body>
+  <section id="auth" class="auth">
+    <h1>Girotondo</h1>
+    <p class="sub">Accedi per vedere i tuoi incarichi.</p>
+    <form id="loginForm">
+      <label class="field">Email<input id="email" type="email" autocomplete="username" required></label>
+      <label class="field">Password<input id="password" type="password" autocomplete="current-password" required></label>
+      <button id="loginBtn" class="btn" type="submit">Accedi</button>
+    </form>
+    <div id="authMessage" role="alert"></div>
+  </section>
+  <div id="app" class="app hidden">
+    <header>
+      <div class="heading"><h1>Girotondo</h1><span class="tag">OPERATORE · TEST</span></div>
+      <div id="identity" class="sub"></div>
+      <div id="days" class="days" aria-label="Giorni della settimana"></div>
+    </header>
+    <main>
+      <div class="line"><div><h2 style="margin:0">I miei incarichi</h2><div id="dateLabel" class="sub"></div></div><button id="logout" class="btn secondary" type="button">Esci</button></div>
+      <div id="status" class="info" role="status">Caricamento…</div>
+      <div id="assignments"></div>
+      <div class="info">🔒 Sola consultazione. La programmazione viene letta da Supabase.</div>
+    </main>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+'use strict';
+const SUPABASE_URL='https://eeowjngdvivbyiwelsnn.supabase.co';
+const SUPABASE_KEY='sb_publishable_f4I2_qMGt4KOYCARvp5_BA_b238Walc';
+const sb=window.supabase?.createClient(SUPABASE_URL,SUPABASE_KEY);
+if(!sb){
+  const message=document.getElementById('authMessage');
+  message.className='info error';
+  message.textContent='Impossibile caricare il collegamento a Supabase. Controlla la connessione Internet e riapri il file.';
+  document.getElementById('loginBtn').disabled=true;
+}else{
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const days=['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+let profile=null;
+let selectedDate=new Date();
+let renderToken=0;
+
+function dateKey(date){
+  return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
+}
+function weekday(date){return ((date.getDay()+6)%7)+1;}
+function weekDates(date){
+  const monday=new Date(date.getFullYear(),date.getMonth(),date.getDate()-(weekday(date)-1));
+  return days.map((_,i)=>new Date(monday.getFullYear(),monday.getMonth(),monday.getDate()+i));
+}
+function showError(error){
+  $('status').className='info error';
+  $('status').textContent='Impossibile caricare gli incarichi: '+(error.message||String(error));
+}
+function renderDays(){
+  $('days').innerHTML=weekDates(selectedDate).map((date,i)=>
+    '<button class="day '+(dateKey(date)===dateKey(selectedDate)?'active':'')+
+    '" type="button" data-date="'+dateKey(date)+'" aria-label="'+esc(days[i]+' '+date.toLocaleDateString('it-IT'))+'">'+days[i]+' '+date.getDate()+'</button>'
+  ).join('');
+}
+async function readRows(table,columns,column,ids){
+  if(!ids.length)return [];
+  const {data,error}=await sb.from(table).select(columns).in(column,ids);
+  if(error)throw error;
+  return data||[];
+}
+async function render(){
+  if(!profile)return;
+  const token=++renderToken;
+  const date=dateKey(selectedDate),day=weekday(selectedDate);
+  renderDays();
+  $('dateLabel').textContent=selectedDate.toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  $('status').className='info';
+  $('status').textContent='Caricamento…';
+  $('assignments').innerHTML='';
+  try{
+    const {data:raw,error:assignmentError}=await sb.from('assegnazioni')
+      .select('id,giro_id,direzione,giorno_settimana,data_specifica,giri(numero),automezzi(numero)')
+      .eq('operatore_id',profile.id);
+    if(assignmentError)throw assignmentError;
+    const relevant=(raw||[]).filter(a=>a.data_specifica===date || (!a.data_specifica && a.giorno_settimana===day));
+    const specific=new Set(relevant.filter(a=>a.data_specifica).map(a=>a.giro_id+'|'+a.direzione));
+    const assignments=relevant.filter(a=>a.data_specifica || !specific.has(a.giro_id+'|'+a.direzione));
+    const routes=(await readRows('tratte','id,giro_id,nome,attivo','giro_id',[...new Set(assignments.map(a=>a.giro_id))]))
+      .filter(t=>t.attivo!==false);
+    const programs=(await readRows('programmazioni_tratta','id,tratta_id,giorno_settimana,data_inizio,data_fine,attivo','tratta_id',routes.map(t=>t.id)))
+      .filter(p=>p.attivo!==false && p.giorno_settimana===day && (!p.data_inizio||p.data_inizio<=date) && (!p.data_fine||p.data_fine>=date));
+    const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note','programmazione_tratta_id',programs.map(p=>p.id)))
+      .sort((a,b)=>a.ordine-b.ordine);
+    const operations=await readRows('operazioni_programmazione','id,fermata_id,assistito_id,azione,orario_previsto,tipo_orario,destinazione,note','fermata_id',stops.map(f=>f.id));
+    const people=await readRows('assistiti','id,nome,cognome','id',[...new Set(operations.map(o=>o.assistito_id))]);
+    if(token!==renderToken)return;
+    const names=new Map(people.map(p=>[p.id,(p.nome||'')+' '+(p.cognome||'')]));
+    const cards=assignments.map(a=>{
+      const matching=routes.filter(t=>t.giro_id===a.giro_id && t.nome.toLowerCase()===String(a.direzione).toLowerCase());
+      const sequences=matching.flatMap(t=>programs.filter(p=>p.tratta_id===t.id).map(p=>({route:t,program:p})));
+      const body=sequences.map(({route,program})=>{
+        const cards=stops.filter(f=>f.programmazione_tratta_id===program.id).map((f,i)=>{
+          const ops=operations.filter(o=>o.fermata_id===f.id).map(o=>
+            '<div class="operation"><strong>'+esc(o.azione)+'</strong> · '+esc(names.get(o.assistito_id)||'Assistito non trovato')+
+            '<div class="muted">🕐 '+esc(o.orario_previsto?String(o.orario_previsto).slice(0,5):'—')+' · '+esc(o.tipo_orario||'A_SEGUIRE')+'</div>'+
+            (o.destinazione?'<div class="muted">📍 '+esc(o.destinazione)+'</div>':'')+
+            (o.note?'<div class="muted">📝 '+esc(o.note)+'</div>':'')+'</div>'
+          ).join('');
+          return '<div class="stop"><strong>Fermata '+(i+1)+' · '+esc(f.nome)+'</strong>'+
+            (f.indirizzo?'<div class="muted">📍 '+esc(f.indirizzo)+'</div>':'')+
+            (f.note?'<div class="muted">📝 '+esc(f.note)+'</div>':'')+
+            (ops||'<div class="muted">Nessuna operazione.</div>')+'</div>';
+        }).join('');
+        return '<div class="sub">'+esc(route.nome)+'</div>'+(cards||'<div class="info">Nessuna fermata configurata.</div>');
+      }).join('');
+      return '<article class="card"><div class="line"><h2>🚐 '+esc(a.automezzi?.numero||a.giri?.numero||'—')+'</h2><span class="badge">'+esc(String(a.direzione).toUpperCase())+'</span></div>'+
+        '<div class="sub">Giro '+esc(a.giri?.numero||'—')+'</div>'+
+        (body||'<div class="info">Nessuna programmazione attiva per questa tratta e questo giorno.</div>')+'</article>';
+    }).join('');
+    $('assignments').innerHTML=cards;
+    $('status').textContent=assignments.length?assignments.length+' incarico/i assegnato/i.':'Nessun incarico assegnato per questo giorno.';
+  }catch(e){if(token===renderToken)showError(e);}
+}
+async function applySession(session){
+  if(!session){
+    profile=null;++renderToken;$('app').classList.add('hidden');$('auth').classList.remove('hidden');return;
+  }
+  try{
+    const {data,error}=await sb.from('operatori').select('id,nome,cognome,ruolo,attivo')
+      .eq('auth_user_id',session.user.id).maybeSingle();
+    if(error)throw error;
+    if(!data||!data.attivo)throw new Error('Profilo operatore non attivo.');
+    profile=data;
+    $('identity').textContent=(data.nome||'')+' '+(data.cognome||'');
+    $('auth').classList.add('hidden');$('app').classList.remove('hidden');
+    await render();
+  }catch(e){
+    profile=null;
+    $('authMessage').className='info error';
+    $('authMessage').textContent=e.message||String(e);
+  }
+}
+$('days').addEventListener('click',e=>{
+  const button=e.target.closest('[data-date]');
+  if(!button)return;
+  const [y,m,d]=button.dataset.date.split('-').map(Number);
+  selectedDate=new Date(y,m-1,d);
+  render();
+});
+$('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  $('authMessage').className='info';
+  $('authMessage').textContent='Accesso in corso…';
+  $('loginBtn').disabled=true;
+  try{
+    const {data,error}=await sb.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
+    if(error)throw error;
+    const session=data?.session||(await sb.auth.getSession()).data?.session;
+    if(!session)throw new Error('Accesso non completato. Riprova.');
+    await applySession(session);
+    if(profile)$('authMessage').textContent='';
+  }catch(error){
+    $('authMessage').className='info error';
+    $('authMessage').textContent=error.message||String(error);
+  }finally{$('loginBtn').disabled=false;}
+});
+$('logout').addEventListener('click',()=>sb.auth.signOut());
+sb.auth.onAuthStateChange((_event,session)=>{setTimeout(()=>applySession(session),0);});
+sb.auth.getSession().then(({data,error})=>{if(error)showError(error);else applySession(data.session);});
+if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+
+</script>
+</body>
+</html>
