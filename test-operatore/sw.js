@@ -1,4 +1,4 @@
-const CACHE='girotondo-operatore-test-0.9.2';
+const CACHE='girotondo-operatore-test-0.9.2.3';
 const SHELL=['./','./index.html','./manifest.json','../icons/icon-192.png','../icons/icon-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)));
