@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · PWA 0.9.9 TEST</title>
+  <title>Girotondo · PWA 0.9.10 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -224,8 +224,8 @@ function absencePanel(route,routePrograms,stops,operations,names,absences,period
 async function routeData(date,day){
   const giri=(await allRows('giri','id,numero,attivo')).filter(g=>g.attivo!==false)
     .sort((a,b)=>String(a.numero).localeCompare(String(b.numero),'it',{numeric:true}));
-  const routes=(await readRows('tratte','id,giro_id,nome,automezzo_id,attivo','giro_id',giri.map(g=>g.id)))
-    .filter(t=>t.attivo!==false);
+  const routes=(await readRows('tratte','id,giro_id,nome,automezzo_id,attivo,ordine','giro_id',giri.map(g=>g.id)))
+    .filter(t=>t.attivo!==false).sort((a,b)=>a.ordine-b.ordine);
   const programs=activePrograms(await readRows('programmazioni_tratta','id,tratta_id,giorno_settimana,data_inizio,data_fine,attivo','tratta_id',routes.map(t=>t.id)),day,date);
   const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note','programmazione_tratta_id',programs.map(p=>p.id))).sort((a,b)=>a.ordine-b.ordine);
   const operations=await readRows('operazioni_programmazione','id,fermata_id,assistito_id,azione,orario_previsto,tipo_orario,destinazione,note','fermata_id',stops.map(f=>f.id));
@@ -306,8 +306,8 @@ async function render(){
       .select('id,giro_id,operatore_id,direzione,giorno_settimana,data_specifica,giri(numero),automezzi(numero)');
     if(assignmentError)throw assignmentError;
     const assignments=effectiveAssignments(raw||[],date,day).filter(a=>a.operatore_id===profile.id);
-    const routes=(await readRows('tratte','id,giro_id,nome,attivo','giro_id',[...new Set(assignments.map(a=>a.giro_id))]))
-      .filter(t=>t.attivo!==false);
+    const routes=(await readRows('tratte','id,giro_id,nome,attivo,ordine','giro_id',[...new Set(assignments.map(a=>a.giro_id))]))
+      .filter(t=>t.attivo!==false).sort((a,b)=>a.ordine-b.ordine);
     const programs=(await readRows('programmazioni_tratta','id,tratta_id,giorno_settimana,data_inizio,data_fine,attivo','tratta_id',routes.map(t=>t.id)))
       .filter(p=>p.attivo!==false && p.giorno_settimana===day && (!p.data_inizio||p.data_inizio<=date) && (!p.data_fine||p.data_fine>=date));
     const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note','programmazione_tratta_id',programs.map(p=>p.id)))
