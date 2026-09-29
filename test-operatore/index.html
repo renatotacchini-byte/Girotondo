@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · PWA 0.9.8 TEST</title>
+  <title>Girotondo · PWA 0.9.9 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -27,6 +27,8 @@
     .contact-links{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px}
     .contact-link{display:inline-block;background:#e8f1f8;color:#174c72;border-radius:9px;padding:8px 10px;font-weight:750;text-decoration:none}
     .contact-link:focus-visible{outline:2px solid #1f4e78;outline-offset:2px}
+    .map-link{color:#1f4e78;text-decoration:underline;text-underline-offset:2px}
+    .map-link:focus-visible{outline:2px solid #1f4e78;outline-offset:2px}
     .line{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.muted{color:#68737d;font-size:13px}
     .badge{background:#edf3f8;color:#1f4e78;border-radius:8px;padding:5px 8px;font-size:11px;font-weight:800}
     .info{background:#f3f5f7;border-radius:10px;padding:11px;font-size:13px;line-height:1.45;margin:12px 0}
@@ -196,7 +198,7 @@ function stopCards(program,stops,operations,names,absences=[],periods=[],giroId=
       (contacts?contactLinks(contacts.get(o.assistito_id)):'')+'</div>';
     }).join('');
     return '<div class="stop"><strong>Fermata '+(i+1)+' · '+esc(f.nome)+'</strong>'+
-      (f.indirizzo?'<div class="muted">📍 '+esc(f.indirizzo)+'</div>':'')+
+      (f.indirizzo?'<div class="muted">📍 <a class="map-link" href="https://www.google.com/maps/dir/?api=1&amp;destination='+esc(encodeURIComponent(f.indirizzo.trim()))+'&amp;travelmode=driving" target="_blank" rel="noopener noreferrer" aria-label="Indicazioni per '+esc(f.nome)+' in Google Maps">'+esc(f.indirizzo)+'</a></div>':'')+
       (f.note?'<div class="muted">📝 '+esc(f.note)+'</div>':'')+
       (ops||'<div class="muted">Nessuna operazione.</div>')+'</div>';
   }).join('');
