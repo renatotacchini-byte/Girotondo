@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · PWA 0.9.7 TEST</title>
+  <title>Girotondo · PWA 0.9.8 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -20,7 +20,11 @@
     main{padding:15px}.card,.stop{border:1px solid #d9dee3;border-radius:14px;padding:13px;margin:10px 0}
     .card h2{font-size:18px;margin:3px 0}.stop{background:#fff;margin:8px 0}
     .operation{background:#f5f7f9;border-left:3px solid #cbd5df;border-radius:7px;padding:9px;margin-top:7px;font-size:14px}
-    .contact-links{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+    .contact-details{margin-top:8px}
+    .assignment .contact-details>summary{display:inline-block;color:#1f4e78;font-size:13px;font-weight:750;padding:4px 0}
+    .contact-details>summary::after{content:' ▾'}
+    .contact-details[open]>summary::after{content:' ▴'}
+    .contact-links{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px}
     .contact-link{display:inline-block;background:#e8f1f8;color:#174c72;border-radius:9px;padding:8px 10px;font-weight:750;text-decoration:none}
     .contact-link:focus-visible{outline:2px solid #1f4e78;outline-offset:2px}
     .line{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.muted{color:#68737d;font-size:13px}
@@ -176,7 +180,7 @@ function contactLinks(person){
     if(number.replace(/\D/g,'').length<5)return '';
     return '<a class="contact-link" href="tel:'+esc(number)+'" aria-label="Chiama '+esc(name)+' al '+esc(phone)+'">📞 '+esc(name)+' · '+esc(phone)+'</a>';
   }).filter(Boolean);
-  return links.length?'<div class="muted" style="margin-top:9px">Contatti in caso di necessità</div><div class="contact-links">'+links.join('')+'</div>':'';
+  return links.length?'<details class="contact-details"><summary>📞 Contatti ('+links.length+')</summary><div class="contact-links">'+links.join('')+'</div></details>':'';
 }
 function stopCards(program,stops,operations,names,absences=[],periods=[],giroId=null,date='',previousDate='',contacts=null){
   const cards=stops.filter(f=>f.programmazione_tratta_id===program.id).map((f,i)=>{
