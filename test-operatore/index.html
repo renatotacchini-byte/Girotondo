@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · PWA 0.9.6 TEST</title>
+  <title>Girotondo · PWA 0.9.7 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -20,6 +20,9 @@
     main{padding:15px}.card,.stop{border:1px solid #d9dee3;border-radius:14px;padding:13px;margin:10px 0}
     .card h2{font-size:18px;margin:3px 0}.stop{background:#fff;margin:8px 0}
     .operation{background:#f5f7f9;border-left:3px solid #cbd5df;border-radius:7px;padding:9px;margin-top:7px;font-size:14px}
+    .contact-links{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+    .contact-link{display:inline-block;background:#e8f1f8;color:#174c72;border-radius:9px;padding:8px 10px;font-weight:750;text-decoration:none}
+    .contact-link:focus-visible{outline:2px solid #1f4e78;outline-offset:2px}
     .line{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.muted{color:#68737d;font-size:13px}
     .badge{background:#edf3f8;color:#1f4e78;border-radius:8px;padding:5px 8px;font-size:11px;font-weight:800}
     .info{background:#f3f5f7;border-radius:10px;padding:11px;font-size:13px;line-height:1.45;margin:12px 0}
@@ -163,7 +166,19 @@ function periodState(periods,giroId,personId,date,previousDate){
   if(relevant.some(p=>p.data_inizio<=date&&p.data_fine>=date))return 'absent';
   return relevant.some(p=>p.data_fine===previousDate)?'returning':null;
 }
-function stopCards(program,stops,operations,names,absences=[],periods=[],giroId=null,date='',previousDate=''){
+function contactLinks(person){
+  if(!person)return '';
+  const links=[1,2].map(n=>{
+    const name=person['contatto_'+n+'_nome'];
+    const phone=String(person['contatto_'+n+'_telefono']||'').trim();
+    if(!name||!phone||!/^\+?[0-9][0-9\s()./-]*$/.test(phone))return '';
+    const number=(phone.startsWith('+')?'+':'')+phone.replace(/\D/g,'');
+    if(number.replace(/\D/g,'').length<5)return '';
+    return '<a class="contact-link" href="tel:'+esc(number)+'" aria-label="Chiama '+esc(name)+' al '+esc(phone)+'">📞 '+esc(name)+' · '+esc(phone)+'</a>';
+  }).filter(Boolean);
+  return links.length?'<div class="muted" style="margin-top:9px">Contatti in caso di necessità</div><div class="contact-links">'+links.join('')+'</div>':'';
+}
+function stopCards(program,stops,operations,names,absences=[],periods=[],giroId=null,date='',previousDate='',contacts=null){
   const cards=stops.filter(f=>f.programmazione_tratta_id===program.id).map((f,i)=>{
     const ops=operations.filter(o=>o.fermata_id===f.id).map(o=>{
       const routeAbsent=absences.some(a=>a.tratta_id===program.tratta_id&&a.assistito_id===o.assistito_id);
@@ -173,7 +188,8 @@ function stopCards(program,stops,operations,names,absences=[],periods=[],giroId=
       (absent?' <span class="absent-label">🔴 ASSENTE</span>':returning?' <span class="return-label">🟢 RIENTRA OGGI</span>':'')+
       '<div class="muted">🕐 '+esc(o.orario_previsto?String(o.orario_previsto).slice(0,5):'—')+' · '+esc(o.tipo_orario||'A_SEGUIRE')+'</div>'+
       (o.destinazione?'<div class="muted">📍 '+esc(o.destinazione)+'</div>':'')+
-      (o.note?'<div class="muted">📝 '+esc(o.note)+'</div>':'')+'</div>';
+      (o.note?'<div class="muted">📝 '+esc(o.note)+'</div>':'')+
+      (contacts?contactLinks(contacts.get(o.assistito_id)):'')+'</div>';
     }).join('');
     return '<div class="stop"><strong>Fermata '+(i+1)+' · '+esc(f.nome)+'</strong>'+
       (f.indirizzo?'<div class="muted">📍 '+esc(f.indirizzo)+'</div>':'')+
@@ -291,17 +307,18 @@ async function render(){
     const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note','programmazione_tratta_id',programs.map(p=>p.id)))
       .sort((a,b)=>a.ordine-b.ordine);
     const operations=await readRows('operazioni_programmazione','id,fermata_id,assistito_id,azione,orario_previsto,tipo_orario,destinazione,note','fermata_id',stops.map(f=>f.id));
-    const people=await readRows('assistiti','id,nome,cognome','id',[...new Set(operations.map(o=>o.assistito_id))]);
+    const people=await readRows('assistiti','id,nome,cognome,contatto_1_nome,contatto_1_telefono,contatto_2_nome,contatto_2_telefono','id',[...new Set(operations.map(o=>o.assistito_id))]);
     const [absences,periods]=await Promise.all([
       readAbsences(date,routes.map(r=>r.id)),readPeriods([...new Set(assignments.map(a=>a.giro_id))])
     ]);
     if(token!==renderToken)return;
     const names=new Map(people.map(p=>[p.id,(p.nome||'')+' '+(p.cognome||'')]));
+    const contacts=new Map(people.map(p=>[p.id,p]));
     const cards=assignments.map(a=>{
       const matching=routes.filter(t=>t.giro_id===a.giro_id && t.nome.toLowerCase()===String(a.direzione).toLowerCase());
       const sequences=matching.flatMap(t=>programs.filter(p=>p.tratta_id===t.id).map(p=>({route:t,program:p})));
       const body=sequences.map(({route,program})=>
-        '<div class="sub">'+esc(route.nome)+'</div>'+stopCards(program,stops,operations,names,absences,periods,route.giro_id,date,previousDate)+
+        '<div class="sub">'+esc(route.nome)+'</div>'+stopCards(program,stops,operations,names,absences,periods,route.giro_id,date,previousDate,contacts)+
         absencePanel(route,[program],stops,operations,names,absences,periods,false,date,previousDate)
       ).join('');
       return '<details class="card assignment"><summary><div class="line"><h2>🚐 '+esc(a.automezzi?.numero||a.giri?.numero||'—')+'</h2><span class="badge">'+esc(String(a.direzione).toUpperCase())+'</span></div>'+
