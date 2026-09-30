@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Girotondo · Scegli fermata sulla mappa</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#1f2937;font:16px Arial,sans-serif}main{max-width:1100px;margin:auto;padding:18px}h1{font-size:24px;margin:0 0 8px}.muted{color:#667085;font-size:14px}form{display:flex;gap:8px;margin:16px 0 8px}input{min-width:0;flex:1;padding:12px;border:1px solid #d0d5dd;border-radius:9px;font:inherit}button{border:0;border-radius:9px;padding:12px 16px;background:#1f2937;color:white;font:700 16px Arial;cursor:pointer}button:disabled{opacity:.5;cursor:default}button.secondary{background:#e8edf3;color:#1f2937}#results{display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto}#results button{text-align:left;font-weight:400}#map{height:clamp(280px,51vh,550px);border:1px solid #d0d5dd;border-radius:12px;margin:12px 0}label{display:block;font-weight:bold;margin:8px 0}#address{width:100%}.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}#status{min-height:20px;margin-top:8px}.point-pin{background:none;border:none}.point-pin span{display:block;width:26px;height:26px;background:#c62020;border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px #0008}#coords{margin-top:6px}@media(max-width:480px){main{padding:12px}form button{padding:10px}h1{font-size:21px}}
+</style></head>
+<body><main><h1>📍 Scegli il punto della fermata</h1><div class="muted">Cerca una via o un paese, poi tocca la mappa o trascina il segnaposto sull’ingresso esatto.</div>
+<form id="searchForm"><input id="search" type="search" placeholder="Via e comune, es. Via Roma, Erba" aria-label="Cerca via o comune"><button id="searchBtn" type="submit">Cerca</button></form><div id="results"></div><div id="status" class="muted" role="status" aria-live="polite"></div>
+<div id="map" aria-label="Mappa interattiva della fermata"></div><label for="address">Indirizzo da mostrare nella scaletta</label><input id="address" type="text" maxlength="1000" placeholder="Puoi correggere l’indirizzo mantenendo il punto selezionato"><div id="coords" class="muted"></div>
+<div class="actions"><button class="secondary" id="cancel" type="button">Annulla</button><button id="confirm" type="button" disabled>Usa questo punto</button></div>
+<div class="muted" style="margin-top:10px">Mappe e ricerca richiedono una connessione Internet.</div></main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id),params=new URLSearchParams(location.hash.slice(1)),token=params.get('token');
+let map,marker,selected=null,revision=0,reverseController=null,searchController=null;
+function valid(lat,lng){return lat!==null&&lng!==null&&lat!==''&&lng!==''&&Number.isFinite(Number(lat))&&Number.isFinite(Number(lng))&&Math.abs(Number(lat))<=90&&Math.abs(Number(lng))<=180;}
+function featureAddress(f){const p=f.properties||{},street=[p.street,p.housenumber].filter(Boolean).join(' '),place=p.city||p.town||p.village||p.county||p.state;return [...new Set([street||p.name,place,p.country].filter(Boolean))].join(', ');}
+async function photon(path,query,signal){const url=new URL(path,'https://photon.komoot.io');for(const [k,v] of Object.entries(query))url.searchParams.set(k,v);const r=await fetch(url,{signal});if(!r.ok)throw new Error('Ricerca temporaneamente non disponibile.');return r.json();}
+function selectPoint(lat,lng,address){
+  reverseController?.abort();revision++;
+  selected={lat:Number(lat),lng:Number(lng)};
+  if(!marker){marker=L.marker([lat,lng],{draggable:true,icon:L.divIcon({className:'point-pin',html:'<span></span>',iconSize:[30,36],iconAnchor:[15,34]})}).addTo(map);marker.on('dragend',()=>{const p=marker.getLatLng();selectPoint(p.lat,p.lng);});}else marker.setLatLng([lat,lng]);
+  $('confirm').disabled=false;$('coords').textContent='Punto selezionato: '+selected.lat.toFixed(6)+', '+selected.lng.toFixed(6);
+  if(address!==undefined){$('address').value=address;$('status').textContent='Puoi spostare il segnaposto per scegliere l’ingresso preciso.';return;}
+  $('address').value='';$('status').textContent='Punto selezionato. Recupero l’indirizzo…';
+  const current=revision;reverseController=new AbortController();const controller=reverseController,timer=setTimeout(()=>controller.abort(),10000);
+  photon('/reverse',{lat:selected.lat,lon:selected.lng,limit:1},reverseController.signal).then(data=>{
+    if(current!==revision)return;
+    $('address').value=data.features?.[0]?featureAddress(data.features[0]):'';
+    $('status').textContent=$('address').value?'Verifica l’indirizzo e conferma il punto.':'Indirizzo non trovato: puoi scriverlo qui sotto. Il punto è già selezionato.';
+  }).catch(()=>{if(current===revision)$('status').textContent='Puoi inserire manualmente l’indirizzo. Il punto preciso è già selezionato.';}).finally(()=>clearTimeout(timer));
+}
+$('address').addEventListener('input',()=>{revision++;reverseController?.abort();});
+$('searchForm').addEventListener('submit',async e=>{
+  e.preventDefault();if(!map)return;const q=$('search').value.trim();if(q.length<3){$('status').textContent='Inserisci almeno 3 caratteri.';return;}
+  searchController?.abort();searchController=new AbortController();const controller=searchController,timer=setTimeout(()=>controller.abort(),12000);
+  $('searchBtn').disabled=true;$('results').replaceChildren();$('status').textContent='Ricerca in corso…';
+  try{const center=map.getCenter(),data=await photon('/api/',{q,limit:5,lat:center.lat,lon:center.lng},controller.signal);if(controller!==searchController)return;
+    const features=(data.features||[]).filter(f=>valid(f.geometry?.coordinates?.[1],f.geometry?.coordinates?.[0]));
+    $('status').textContent=features.length?'Scegli un risultato, poi verifica il punto sulla mappa.':'Nessun risultato. Prova aggiungendo il comune o scegli direttamente sulla mappa.';
+    for(const f of features){const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent=featureAddress(f)||'Punto trovato';b.addEventListener('click',()=>{const [lng,lat]=f.geometry.coordinates;selectPoint(lat,lng,featureAddress(f));map.setView([lat,lng],18);$('results').replaceChildren();});$('results').appendChild(b);}
+  }catch(e){if(controller===searchController)$('status').textContent='Ricerca non disponibile. Puoi selezionare il punto direttamente sulla mappa.';}
+  finally{clearTimeout(timer);if(controller===searchController)$('searchBtn').disabled=false;}
+});
+$('cancel').addEventListener('click',()=>window.close());
+$('confirm').addEventListener('click',()=>{
+  if(!selected||!token||!window.opener){$('status').textContent='Apri la mappa dal pulsante “Scegli sulla mappa” nel pannello organizzatore.';return;}
+  revision++;reverseController?.abort();
+  window.opener.postMessage({type:'girotondo-stop-point',token,lat:selected.lat,lng:selected.lng,address:$('address').value.trim()},'*');
+  $('status').textContent='Punto inviato al pannello. Torna alla fermata e salva le modifiche.';
+});
+$('search').value=params.get('address')||'';$('address').value=params.get('address')||'';
+try{
+  if(!window.L)throw new Error('Mappa non caricata');
+  const hasPoint=valid(params.get('lat'),params.get('lng')),center=hasPoint?[Number(params.get('lat')),Number(params.get('lng'))]:[45.81,9.225];
+  map=L.map('map').setView(center,hasPoint?18:12);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).on('tileerror',()=>{$('status').textContent='Alcune parti della mappa non sono disponibili. Controlla la connessione.';}).addTo(map);
+  map.on('click',e=>selectPoint(e.latlng.lat,e.latlng.lng));
+  if(hasPoint)selectPoint(...center,params.get('address')||'');
+  if(!token||!window.opener)$('status').textContent='Apri questa mappa dal pannello organizzatore per salvare il punto.';
+}catch(e){$('status').textContent='Impossibile caricare la mappa. Torna al pannello e inserisci l’indirizzo manualmente.';$('searchBtn').disabled=true;}
+</script></body></html>
