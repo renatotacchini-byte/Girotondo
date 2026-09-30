@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · PWA 0.9.12 TEST</title>
+  <title>Girotondo · PWA 0.9.13 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -213,11 +213,16 @@ function stopCards(program,stops,operations,names,absences=[],periods=[],giroId=
     }).join('');
     return '<div class="stop"><strong>Fermata '+(i+1)+' · '+esc(f.nome)+'</strong>'+
       '<div class="muted">🕐 '+esc(f.orario_previsto?String(f.orario_previsto).slice(0,5):'—')+' · '+esc(f.tipo_orario==='FISSO'?'Fisso':'A seguire')+'</div>'+
-      (f.indirizzo?'<div class="muted">📍 <a class="map-link" href="https://www.google.com/maps/dir/?api=1&amp;destination='+esc(encodeURIComponent(f.indirizzo.trim()))+'&amp;travelmode=driving" target="_blank" rel="noopener noreferrer" aria-label="Indicazioni per '+esc(f.nome)+' in Google Maps">'+esc(f.indirizzo)+'</a></div>':'')+
+      ((f.indirizzo||stopDestination(f))?'<div class="muted">📍 <a class="map-link" href="https://www.google.com/maps/dir/?api=1&amp;destination='+esc(encodeURIComponent(stopDestination(f)))+'&amp;travelmode=driving" target="_blank" rel="noopener noreferrer" aria-label="Indicazioni per '+esc(f.nome)+' in Google Maps">'+esc(f.indirizzo||'Punto sulla mappa')+'</a></div>':'')+
       (f.note?'<div class="muted">📝 '+esc(f.note)+'</div>':'')+
       (ops||'<div class="muted">Nessuna operazione.</div>')+'</div>';
   }).join('');
   return (program.data_specifica?'<div class="info"><strong>📅 Scaletta modificata per il '+esc(program.data_specifica.split('-').reverse().join('/'))+'</strong></div>':'')+(cards||'<div class="info">Nessuna fermata configurata.</div>');
+}
+function stopDestination(f){
+  const lat=f.latitudine,lng=f.longitudine;
+  if(lat!==null&&lat!==undefined&&lng!==null&&lng!==undefined&&Number.isFinite(Number(lat))&&Number.isFinite(Number(lng))&&Number(lat)>=-90&&Number(lat)<=90&&Number(lng)>=-180&&Number(lng)<=180)return Number(lat)+','+Number(lng);
+  return (f.indirizzo||'').trim();
 }
 function absencePanel(route,routePrograms,stops,operations,names,absences,periods,editable,date,previousDate){
   const stopIds=new Set(stops.filter(f=>routePrograms.some(p=>p.id===f.programmazione_tratta_id)).map(f=>f.id));
@@ -242,7 +247,7 @@ async function routeData(date,day){
   const routes=(await readRows('tratte','id,giro_id,nome,automezzo_id,attivo,ordine','giro_id',giri.map(g=>g.id)))
     .filter(t=>t.attivo!==false).sort((a,b)=>a.ordine-b.ordine);
   const programs=activePrograms(await readRows('programmazioni_tratta','id,tratta_id,giorno_settimana,data_inizio,data_fine,attivo,data_specifica','tratta_id',routes.map(t=>t.id)),day,date);
-  const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note,orario_previsto,tipo_orario','programmazione_tratta_id',programs.map(p=>p.id))).sort((a,b)=>a.ordine-b.ordine);
+  const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note,orario_previsto,tipo_orario,latitudine,longitudine','programmazione_tratta_id',programs.map(p=>p.id))).sort((a,b)=>a.ordine-b.ordine);
   const operations=await readRows('operazioni_programmazione','id,fermata_id,assistito_id,azione,orario_previsto,tipo_orario,destinazione,note','fermata_id',stops.map(f=>f.id));
   const people=await readRows('assistiti','id,nome,cognome','id',[...new Set(operations.map(o=>o.assistito_id))]);
   const names=new Map(people.map(p=>[p.id,(p.nome||'')+' '+(p.cognome||'')]));
@@ -324,7 +329,7 @@ async function render(){
     const routes=(await readRows('tratte','id,giro_id,nome,attivo,ordine','giro_id',[...new Set(assignments.map(a=>a.giro_id))]))
       .filter(t=>t.attivo!==false).sort((a,b)=>a.ordine-b.ordine);
     const programs=activePrograms(await readRows('programmazioni_tratta','id,tratta_id,giorno_settimana,data_inizio,data_fine,attivo,data_specifica','tratta_id',routes.map(t=>t.id)),day,date);
-    const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note,orario_previsto,tipo_orario','programmazione_tratta_id',programs.map(p=>p.id)))
+    const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note,orario_previsto,tipo_orario,latitudine,longitudine','programmazione_tratta_id',programs.map(p=>p.id)))
       .sort((a,b)=>a.ordine-b.ordine);
     const operations=await readRows('operazioni_programmazione','id,fermata_id,assistito_id,azione,orario_previsto,tipo_orario,destinazione,note','fermata_id',stops.map(f=>f.id));
     const people=await readRows('assistiti','id,nome,cognome,contatto_1_nome,contatto_1_telefono,contatto_2_nome,contatto_2_telefono','id',[...new Set(operations.map(o=>o.assistito_id))]);
