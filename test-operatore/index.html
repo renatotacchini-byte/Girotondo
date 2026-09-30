@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · PWA 0.9.10 TEST</title>
+  <title>Girotondo · PWA 0.9.11 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -159,8 +159,11 @@ async function allRows(table,columns){
   return data||[];
 }
 function activePrograms(rows,day,date){
-  return rows.filter(p=>p.attivo!==false && p.giorno_settimana===day &&
-    (!p.data_inizio||p.data_inizio<=date) && (!p.data_fine||p.data_fine>=date));
+  const active=rows.filter(p=>p.attivo!==false);
+  const dated=active.filter(p=>p.data_specifica===date);
+  const overridden=new Set(dated.map(p=>p.tratta_id));
+  return dated.concat(active.filter(p=>!p.data_specifica && !overridden.has(p.tratta_id) && p.giorno_settimana===day &&
+    (!p.data_inizio||p.data_inizio<=date) && (!p.data_fine||p.data_fine>=date)));
 }
 function effectiveAssignments(rows,date,day){
   const relevant=rows.filter(a=>a.data_specifica===date || (!a.data_specifica&&a.giorno_settimana===day));
@@ -192,17 +195,17 @@ function stopCards(program,stops,operations,names,absences=[],periods=[],giroId=
       const absent=routeAbsent||period==='absent',returning=!absent&&period==='returning';
       return '<div class="operation'+(absent?' absent':returning?' returning':'')+'"><strong>'+esc(o.azione)+'</strong> · '+esc(names.get(o.assistito_id)||'Assistito non trovato')+
       (absent?' <span class="absent-label">🔴 ASSENTE</span>':returning?' <span class="return-label">🟢 RIENTRA OGGI</span>':'')+
-      '<div class="muted">🕐 '+esc(o.orario_previsto?String(o.orario_previsto).slice(0,5):'—')+' · '+esc(o.tipo_orario||'A_SEGUIRE')+'</div>'+
       (o.destinazione?'<div class="muted">📍 '+esc(o.destinazione)+'</div>':'')+
       (o.note?'<div class="muted">📝 '+esc(o.note)+'</div>':'')+
       (contacts?contactLinks(contacts.get(o.assistito_id)):'')+'</div>';
     }).join('');
     return '<div class="stop"><strong>Fermata '+(i+1)+' · '+esc(f.nome)+'</strong>'+
+      '<div class="muted">🕐 '+esc(f.orario_previsto?String(f.orario_previsto).slice(0,5):'—')+' · '+esc(f.tipo_orario==='FISSO'?'Fisso':'A seguire')+'</div>'+
       (f.indirizzo?'<div class="muted">📍 <a class="map-link" href="https://www.google.com/maps/dir/?api=1&amp;destination='+esc(encodeURIComponent(f.indirizzo.trim()))+'&amp;travelmode=driving" target="_blank" rel="noopener noreferrer" aria-label="Indicazioni per '+esc(f.nome)+' in Google Maps">'+esc(f.indirizzo)+'</a></div>':'')+
       (f.note?'<div class="muted">📝 '+esc(f.note)+'</div>':'')+
       (ops||'<div class="muted">Nessuna operazione.</div>')+'</div>';
   }).join('');
-  return cards||'<div class="info">Nessuna fermata configurata.</div>';
+  return (program.data_specifica?'<div class="info"><strong>📅 Scaletta modificata per il '+esc(program.data_specifica.split('-').reverse().join('/'))+'</strong></div>':'')+(cards||'<div class="info">Nessuna fermata configurata.</div>');
 }
 function absencePanel(route,routePrograms,stops,operations,names,absences,periods,editable,date,previousDate){
   const stopIds=new Set(stops.filter(f=>routePrograms.some(p=>p.id===f.programmazione_tratta_id)).map(f=>f.id));
@@ -226,8 +229,8 @@ async function routeData(date,day){
     .sort((a,b)=>String(a.numero).localeCompare(String(b.numero),'it',{numeric:true}));
   const routes=(await readRows('tratte','id,giro_id,nome,automezzo_id,attivo,ordine','giro_id',giri.map(g=>g.id)))
     .filter(t=>t.attivo!==false).sort((a,b)=>a.ordine-b.ordine);
-  const programs=activePrograms(await readRows('programmazioni_tratta','id,tratta_id,giorno_settimana,data_inizio,data_fine,attivo','tratta_id',routes.map(t=>t.id)),day,date);
-  const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note','programmazione_tratta_id',programs.map(p=>p.id))).sort((a,b)=>a.ordine-b.ordine);
+  const programs=activePrograms(await readRows('programmazioni_tratta','id,tratta_id,giorno_settimana,data_inizio,data_fine,attivo,data_specifica','tratta_id',routes.map(t=>t.id)),day,date);
+  const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note,orario_previsto,tipo_orario','programmazione_tratta_id',programs.map(p=>p.id))).sort((a,b)=>a.ordine-b.ordine);
   const operations=await readRows('operazioni_programmazione','id,fermata_id,assistito_id,azione,orario_previsto,tipo_orario,destinazione,note','fermata_id',stops.map(f=>f.id));
   const people=await readRows('assistiti','id,nome,cognome','id',[...new Set(operations.map(o=>o.assistito_id))]);
   const names=new Map(people.map(p=>[p.id,(p.nome||'')+' '+(p.cognome||'')]));
@@ -308,9 +311,8 @@ async function render(){
     const assignments=effectiveAssignments(raw||[],date,day).filter(a=>a.operatore_id===profile.id);
     const routes=(await readRows('tratte','id,giro_id,nome,attivo,ordine','giro_id',[...new Set(assignments.map(a=>a.giro_id))]))
       .filter(t=>t.attivo!==false).sort((a,b)=>a.ordine-b.ordine);
-    const programs=(await readRows('programmazioni_tratta','id,tratta_id,giorno_settimana,data_inizio,data_fine,attivo','tratta_id',routes.map(t=>t.id)))
-      .filter(p=>p.attivo!==false && p.giorno_settimana===day && (!p.data_inizio||p.data_inizio<=date) && (!p.data_fine||p.data_fine>=date));
-    const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note','programmazione_tratta_id',programs.map(p=>p.id)))
+    const programs=activePrograms(await readRows('programmazioni_tratta','id,tratta_id,giorno_settimana,data_inizio,data_fine,attivo,data_specifica','tratta_id',routes.map(t=>t.id)),day,date);
+    const stops=(await readRows('fermate_programmazione','id,programmazione_tratta_id,ordine,nome,indirizzo,note,orario_previsto,tipo_orario','programmazione_tratta_id',programs.map(p=>p.id)))
       .sort((a,b)=>a.ordine-b.ordine);
     const operations=await readRows('operazioni_programmazione','id,fermata_id,assistito_id,azione,orario_previsto,tipo_orario,destinazione,note','fermata_id',stops.map(f=>f.id));
     const people=await readRows('assistiti','id,nome,cognome,contatto_1_nome,contatto_1_telefono,contatto_2_nome,contatto_2_telefono','id',[...new Set(operations.map(o=>o.assistito_id))]);
