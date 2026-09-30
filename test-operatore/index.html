@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · PWA 0.9.11 TEST</title>
+  <title>Girotondo · PWA 0.9.12 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -15,6 +15,7 @@
     .heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
     h1{font-size:24px;margin:0}.tag{font-size:11px;font-weight:800;background:#edf3f8;color:#1f4e78;padding:7px;border-radius:9px}
     .sub{font-size:13px;color:#68737d}.days{display:flex;gap:6px;overflow:auto;margin-top:14px}
+    .calendar-nav{display:flex;gap:6px;align-items:center;margin-top:12px}.calendar-nav .btn{padding:8px 10px;font-size:14px;min-height:40px}.calendar-nav input{flex:1;min-width:0;width:auto;margin:0;padding:7px;font:inherit;font-size:14px;min-height:40px}
     .day{border:1px solid #d6dbe0;background:#fff;border-radius:9px;padding:8px 12px;white-space:nowrap;font:inherit}
     .day.active{border-color:#1f4e78;color:#1f4e78;background:#eef4f9;font-weight:750}
     main{padding:15px}.card,.stop{border:1px solid #d9dee3;border-radius:14px;padding:13px;margin:10px 0}
@@ -93,6 +94,12 @@
       <div class="heading"><h1>Girotondo</h1><span class="tag">OPERATORE · TEST</span></div>
       <div id="identity" class="sub"></div>
       <nav class="tabs" aria-label="Sezioni"><button id="tabOperator" class="tab active" type="button">👤 Operatore</button><button id="tabAuto" class="tab" type="button">🚐 Auto</button><button id="tabOrganizer" class="tab hidden" type="button">👨‍💼 Organizzatore</button></nav>
+      <nav class="calendar-nav" aria-label="Navigazione calendario">
+        <button id="previousWeek" class="btn secondary" type="button" aria-label="Settimana precedente">←</button>
+        <button id="calendarToday" class="btn secondary" type="button">Oggi</button>
+        <input id="calendarDate" type="date" aria-label="Scegli una data">
+        <button id="nextWeek" class="btn secondary" type="button" aria-label="Settimana successiva">→</button>
+      </nav>
       <div id="days" class="days" aria-label="Giorni della settimana"></div>
     </header>
     <main>
@@ -141,7 +148,12 @@ function showError(error){
   $('status').className='info error';
   $('status').textContent='Impossibile caricare i dati: '+(error.message||String(error));
 }
+function shiftCalendarWeek(offset){
+  selectedDate=new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()+offset*7);
+  render();
+}
 function renderDays(){
+  $('calendarDate').value=dateKey(selectedDate);
   $('days').innerHTML=weekDates(selectedDate).map((date,i)=>
     '<button class="day '+(dateKey(date)===dateKey(selectedDate)?'active':'')+
     '" type="button" data-date="'+dateKey(date)+'" aria-label="'+esc(days[i]+' '+date.toLocaleDateString('it-IT'))+'">'+days[i]+' '+date.getDate()+'</button>'
@@ -388,6 +400,15 @@ async function applySession(session){
     message.textContent=e.message||String(e);
   }
 }
+$('previousWeek').addEventListener('click',()=>shiftCalendarWeek(-1));
+$('nextWeek').addEventListener('click',()=>shiftCalendarWeek(1));
+$('calendarToday').addEventListener('click',()=>{selectedDate=new Date();render();});
+$('calendarDate').addEventListener('change',e=>{
+  if(!e.target.value || !e.target.validity.valid)return;
+  const [y,m,d]=e.target.value.split('-').map(Number);
+  selectedDate=new Date(y,m-1,d);
+  render();
+});
 $('days').addEventListener('click',e=>{
   const button=e.target.closest('[data-date]');
   if(!button)return;
