@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · PWA 0.9.15 TEST</title>
+  <title>Girotondo · PWA 0.9.16 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -329,7 +329,7 @@ async function renderOrganizer(token,date,day){
         '</div><label class="field">Validità<select name="scope"><option value="date">Solo '+esc(date)+'</option><option value="weekly">Ogni '+esc(days[day-1])+'</option></select></label>'+
         '</form>':
         '<div class="info">La tratta con nome libero non è ancora compatibile con le assegnazioni Andata/Ritorno.</div>')+
-      absencePanel(route,routePrograms,stops,operations,names,absences,periods,false,date,previousDate)+'</section>';
+      ''+'</section>';
   }).join('')+'</section>';}).join('')+'<div class="card" style="position:sticky;bottom:0;z-index:2"><button id="saveAssignments" class="btn" type="button" disabled>Salva assegnazioni</button><div class="sub">Le modifiche evidenziate verranno salvate insieme.</div></div>';
   document.querySelectorAll('.assign-form').forEach(form=>{
     form.dataset.initial=assignmentState(form);
