@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
-  <title>Girotondo · PWA 0.9.13 TEST</title>
+  <title>Girotondo · PWA 0.9.14 TEST</title>
   <style>
     *{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18212b;font-family:system-ui,sans-serif}
     .app{max-width:620px;min-height:100vh;margin:auto;background:#fff}
@@ -135,6 +135,21 @@ let profile=null;
 let selectedDate=new Date();
 let renderToken=0;
 let activeView='operator';
+let assignmentSaving=false;
+const assignmentDrafts=new Map();
+function leaveAssignments(){
+  if(assignmentSaving)return false;
+  if(!assignmentDrafts.size)return true;
+  if(!confirm('Ci sono assegnazioni non salvate. Vuoi abbandonare le modifiche?'))return false;
+  assignmentDrafts.clear();return true;
+}
+window.addEventListener('beforeunload',e=>{if(assignmentDrafts.size||assignmentSaving){e.preventDefault();e.returnValue='';}});
+function assignmentState(form){return JSON.stringify([form.elements.operatore.value,form.elements.automezzo.value,form.elements.scope.value]);}
+function updateAssignmentButton(){
+  const button=$('saveAssignments');
+  if(button){button.disabled=assignmentSaving||!assignmentDrafts.size;button.textContent=assignmentSaving?'Salvataggio…':'Salva assegnazioni'+(assignmentDrafts.size?' ('+assignmentDrafts.size+')':'');}
+}
+
 
 function dateKey(date){
   return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
@@ -149,6 +164,7 @@ function showError(error){
   $('status').textContent='Impossibile caricare i dati: '+(error.message||String(error));
 }
 function shiftCalendarWeek(offset){
+  if(!leaveAssignments())return;
   selectedDate=new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()+offset*7);
   render();
 }
@@ -289,24 +305,29 @@ async function renderOrganizer(token,date,day){
   const assigned=effectiveAssignments(raw,date,day),opNames=new Map(operators.map(o=>[o.id,(o.nome||'')+' '+(o.cognome||'')]));
   const vehicleNames=new Map(vehicles.map(v=>[v.id,v.numero]));
   const visible=routes.filter(t=>programs.some(p=>p.tratta_id===t.id));
-  $('assignments').innerHTML='<div class="info">Assegna un operatore per la settimana oppure solo per la data selezionata. La modifica per una data prevale su quella settimanale.</div>'+visible.map(route=>{
-    const giro=giri.find(g=>g.id===route.giro_id);
+  $('assignments').innerHTML='<div class="info">Assegna un operatore per la settimana oppure solo per la data selezionata. La modifica per una data prevale su quella settimanale.</div>'+giri.map(giro=>{const group=visible.filter(route=>route.giro_id===giro.id);if(!group.length)return '';return '<section class="card"><h2>🚐 Giro '+esc(giro.numero)+'</h2>'+group.map(route=>{
     const direction=String(route.nome).toLowerCase();
     const compatible=['andata','ritorno'].includes(direction);
     const current=assigned.find(a=>a.giro_id===route.giro_id&&a.direzione===direction);
     const routePrograms=programs.filter(p=>p.tratta_id===route.id);
     const opOptions=operators.filter(o=>o.attivo!==false).map(o=>'<option value="'+esc(o.id)+'" '+(current?.operatore_id===o.id?'selected':'')+'>'+esc((o.nome||'')+' '+(o.cognome||''))+'</option>').join('');
     const vehicleOptions=vehicles.filter(v=>v.attivo!==false).map(v=>'<option value="'+esc(v.id)+'" '+((current?.automezzo_id||route.automezzo_id)===v.id?'selected':'')+'>'+esc(v.numero)+'</option>').join('');
-    return '<section class="card"><h2>🚐 Giro '+esc(giro?.numero||'—')+' · '+esc(route.nome)+'</h2>'+
+    return '<section class="assignment-route"><h3>'+esc(route.nome)+'</h3>'+
       '<div class="sub">'+(current?'Assegnato a '+esc(opNames.get(current.operatore_id)||'Operatore')+' · Auto '+esc(vehicleNames.get(current.automezzo_id)||'—')+(current.data_specifica?' · Solo oggi':' · Settimanale'):'Da coprire')+'</div>'+
       (compatible?'<form class="assign-form" data-giro="'+esc(route.giro_id)+'" data-direction="'+esc(direction)+'"><div class="form-grid">'+
         '<label class="field">Operatore<select name="operatore" required><option value="">Seleziona</option>'+opOptions+'</select></label>'+
         '<label class="field">Auto<select name="automezzo" required><option value="">Seleziona</option>'+vehicleOptions+'</select></label>'+
         '</div><label class="field">Validità<select name="scope"><option value="date">Solo '+esc(date)+'</option><option value="weekly">Ogni '+esc(days[day-1])+'</option></select></label>'+
-        '<button class="btn small-btn" type="submit">Salva assegnazione</button></form>':
+        '</form>':
         '<div class="info">La tratta con nome libero non è ancora compatibile con le assegnazioni Andata/Ritorno.</div>')+
       absencePanel(route,routePrograms,stops,operations,names,absences,periods,true,date,previousDate)+'</section>';
-  }).join('');
+  }).join('')+'</section>';}).join('')+'<div class="card" style="position:sticky;bottom:0;z-index:2"><button id="saveAssignments" class="btn" type="button" disabled>Salva assegnazioni</button><div class="sub">Le modifiche evidenziate verranno salvate insieme.</div></div>';
+  document.querySelectorAll('.assign-form').forEach(form=>{
+    form.dataset.initial=assignmentState(form);
+    const draft=assignmentDrafts.get(form.dataset.giro+':'+form.dataset.direction);
+    if(draft){form.elements.operatore.value=draft.operatore_id;form.elements.automezzo.value=draft.automezzo_id;form.elements.scope.value=draft.scope;form.style.borderLeft='4px solid #e5a000';}
+  });
+  updateAssignmentButton();
   $('status').textContent=visible.length?visible.length+' tratte programmate · '+visible.filter(r=>!assigned.some(a=>a.giro_id===r.giro_id&&a.direzione===String(r.nome).toLowerCase())).length+' da coprire.':'Nessuna tratta programmata per questo giorno.';
 }
 async function render(){
@@ -407,9 +428,10 @@ async function applySession(session){
 }
 $('previousWeek').addEventListener('click',()=>shiftCalendarWeek(-1));
 $('nextWeek').addEventListener('click',()=>shiftCalendarWeek(1));
-$('calendarToday').addEventListener('click',()=>{selectedDate=new Date();render();});
+$('calendarToday').addEventListener('click',()=>{if(!leaveAssignments())return;selectedDate=new Date();render();});
 $('calendarDate').addEventListener('change',e=>{
   if(!e.target.value || !e.target.validity.valid)return;
+  if(!leaveAssignments()){e.target.value=dateKey(selectedDate);return;}
   const [y,m,d]=e.target.value.split('-').map(Number);
   selectedDate=new Date(y,m-1,d);
   render();
@@ -417,12 +439,14 @@ $('calendarDate').addEventListener('change',e=>{
 $('days').addEventListener('click',e=>{
   const button=e.target.closest('[data-date]');
   if(!button)return;
+  if(!leaveAssignments())return;
   const [y,m,d]=button.dataset.date.split('-').map(Number);
   selectedDate=new Date(y,m-1,d);
   render();
 });
 function selectView(view,refresh=true){
   if(view==='organizer'&&!['organizzatore','entrambi'].includes(profile?.ruolo))return;
+  if(refresh&&!leaveAssignments())return;
   activeView=view;
   for(const [name,id] of [['operator','tabOperator'],['auto','tabAuto'],['organizer','tabOrganizer']]){
     $(id).classList.toggle('active',name===view);
@@ -457,31 +481,44 @@ $('assignments').addEventListener('submit',async e=>{
     finally{button.disabled=false;}
     return;
   }
-  const form=e.target.closest('.assign-form');
-  if(!form)return;
-  e.preventDefault();
-  if(!['organizzatore','entrambi'].includes(profile?.ruolo))return;
-  const giro_id=form.dataset.giro,direzione=form.dataset.direction;
-  const operatore_id=form.elements.operatore.value,automezzo_id=form.elements.automezzo.value;
-  const scope=form.elements.scope.value,date=dateKey(selectedDate),day=weekday(selectedDate);
-  const button=form.querySelector('button[type="submit"]');button.disabled=true;
-  actionFeedback('Salvataggio assegnazione…');
-  try{
-    let query=sb.from('assegnazioni').select('id').eq('giro_id',giro_id).eq('direzione',direzione);
-    query=scope==='date'?query.eq('data_specifica',date):query.is('data_specifica',null).eq('giorno_settimana',day);
-    const {data:existing,error:readError}=await query.maybeSingle();
-    if(readError)throw readError;
-    const values={operatore_id,automezzo_id};
-    const result=existing?await sb.from('assegnazioni').update(values).eq('id',existing.id).select('id').single():
-      await sb.from('assegnazioni').insert({...values,giro_id,direzione,
-        giorno_settimana:scope==='weekly'?day:null,data_specifica:scope==='date'?date:null}).select('id').single();
-    if(result.error)throw result.error;
-    await render();
-    actionFeedback('Assegnazione salvata.');
-  }catch(error){actionFeedback('Assegnazione non salvata: '+(error.message||String(error)),true);}
-  finally{button.disabled=false;}
+  if(e.target.closest('.assign-form'))e.preventDefault();
 });
+$('assignments').addEventListener('change',e=>{
+  const form=e.target.closest('.assign-form');if(!form)return;
+  const key=form.dataset.giro+':'+form.dataset.direction;
+  if(assignmentState(form)===form.dataset.initial)assignmentDrafts.delete(key);
+  else assignmentDrafts.set(key,{giro_id:form.dataset.giro,direzione:form.dataset.direction,operatore_id:form.elements.operatore.value,automezzo_id:form.elements.automezzo.value,scope:form.elements.scope.value});
+  form.style.borderLeft=assignmentDrafts.has(key)?'4px solid #e5a000':'';
+  updateAssignmentButton();
+});
+async function saveAssignments(){
+  if(assignmentSaving||!assignmentDrafts.size||!['organizzatore','entrambi'].includes(profile?.ruolo))return;
+  for(const form of document.querySelectorAll('.assign-form')){
+    if(assignmentDrafts.has(form.dataset.giro+':'+form.dataset.direction)&&!form.reportValidity())return;
+  }
+  const date=dateKey(selectedDate),day=weekday(selectedDate);
+  assignmentSaving=true;updateAssignmentButton();
+  document.querySelectorAll('#assignments select, #assignments button').forEach(el=>el.disabled=true);
+  let saved=0;
+  try{
+    for(const [key,draft] of assignmentDrafts){
+      const {giro_id,direzione,operatore_id,automezzo_id,scope}=draft;
+      let query=sb.from('assegnazioni').select('id').eq('giro_id',giro_id).eq('direzione',direzione);
+      query=scope==='date'?query.eq('data_specifica',date):query.is('data_specifica',null).eq('giorno_settimana',day);
+      const {data:existing,error:readError}=await query.maybeSingle();if(readError)throw readError;
+      const values={operatore_id,automezzo_id};
+      const result=existing?await sb.from('assegnazioni').update(values).eq('id',existing.id).select('id').single():
+        await sb.from('assegnazioni').insert({...values,giro_id,direzione,giorno_settimana:scope==='weekly'?day:null,data_specifica:scope==='date'?date:null}).select('id').single();
+      if(result.error)throw result.error;
+      assignmentDrafts.delete(key);saved++;
+    }
+    actionFeedback(saved+' assegnazioni salvate.');
+  }catch(error){actionFeedback(saved+' assegnazioni salvate. Le modifiche rimanenti non sono salvate: '+(error.message||String(error))+'. Premi Salva per riprovare.',true);}
+  finally{assignmentSaving=false;await render();}
+}
 $('assignments').addEventListener('click',async e=>{
+  if(e.target.closest('#saveAssignments')){await saveAssignments();return;}
+  if(assignmentSaving)return;
   const add=e.target.closest('[data-absence-route][data-absence-person]');
   const remove=e.target.closest('[data-absence-remove]');
   const periodRemove=e.target.closest('[data-period-remove]');
@@ -539,7 +576,7 @@ $('setupForm').addEventListener('submit',async e=>{
     $('setupMessage').textContent=error.message||String(error);
   }finally{$('setupBtn').disabled=false;}
 });
-$('logout').addEventListener('click',()=>sb.auth.signOut());
+$('logout').addEventListener('click',()=>{if(leaveAssignments())sb.auth.signOut();});
 sb.auth.onAuthStateChange((_event,session)=>{setTimeout(()=>applySession(session),0);});
 if(inviteTokenHash){
   (async()=>{
